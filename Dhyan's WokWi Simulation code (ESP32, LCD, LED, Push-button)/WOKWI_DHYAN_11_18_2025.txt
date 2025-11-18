@@ -1,0 +1,77 @@
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include "HX711.h"
+
+// LCD: I2C address 0x27, 16x2 characters
+LiquidCrystal_I2C LCD(0x27, 16, 2);
+
+// HX711 pins (change if you wire differently)
+#define LOADCELL_DOUT_PIN  4
+#define LOADCELL_SCK_PIN   5
+
+HX711 scale;
+
+// Adjust this to match your load cell calibration
+// This value is just a placeholder – you MUST calibrate!
+float calibration_factor = -7000.0;  
+
+float peakForce = 0.0;   // stores peak force reading
+
+void setup() {
+  Serial.begin(115200);
+
+  // LCD init
+  LCD.init();
+  LCD.backlight();
+  LCD.clear();
+  LCD.setCursor(0, 0);
+  LCD.print("Load Cell Demo");
+  LCD.setCursor(0, 1);
+  LCD.print("Init...");
+
+  // HX711 init
+  scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
+
+  // Set the initial scale factor
+  scale.set_scale(calibration_factor);
+
+  // Tare the scale (zero it)
+  scale.tare();  
+
+  LCD.clear();
+  LCD.setCursor(0, 0);
+  LCD.print("Place load...");
+  delay(1500);
+  LCD.clear();
+}
+
+void loop() {
+  // Read the load cell (average of 5 samples)
+  float force = scale.get_units(5);  
+
+  // Track peak
+  if (force > peakForce) {
+    peakForce = force;
+  }
+
+  // Display current force on first line
+  LCD.setCursor(0, 0);
+  LCD.print("F: ");
+  LCD.print(force, 1);   // 1 decimal place
+  LCD.print(" kg    ");  // spaces to clear old chars
+
+  // Display peak force on second line
+  LCD.setCursor(0, 1);
+  LCD.print("Peak: ");
+  LCD.print(peakForce, 1);
+  LCD.print(" kg    ");
+
+  // Also print to Serial for debugging
+  Serial.print("Force: ");
+  Serial.print(force, 2);
+  Serial.print(" kg  | Peak: ");
+  Serial.print(peakForce, 2);
+  Serial.println(" kg");
+
+  delay(200);
+}
