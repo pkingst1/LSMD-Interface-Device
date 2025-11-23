@@ -61,7 +61,8 @@ String formatVoltageString(float v) {
 float readVoltage() {
   // simple conversion: ADC 12-bit (0-4095) -> 0 - 3.3V
   uint16_t raw = analogRead(ADC_PIN);
-  float v = (raw / 4095.0f) * 3.3f;
+  int D = raw - 2800;
+  float v = (D * (300/0.02)*(3.3/(125.2*4096)));
   return v;
 }
 
