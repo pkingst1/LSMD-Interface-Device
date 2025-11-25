@@ -1,0 +1,317 @@
+/*
+  ESP32 BLE measurement peripheral
+  - Press PB (GPIO25) to start advertising ("LSMD-DIU Central")
+  - Laptop client sends commands:
+        "MEAS:<secs>"
+        "STOP"
+  - Data characteristic: notify voltage readings
+  - Status characteristic: notify status strings
+  - LCD (I2C 0x27) displays current mode/state
+  - Deep sleep after 5 minutes idle
+*/
+
+#include <BLEDevice.h>
+#include <BLEUtils.h>
+#include <BLEServer.h>
+#include <BLE2902.h>
+#include "esp_sleep.h"
+
+// ---------- LCD ----------
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+const int I2C_SDA_PIN = 21;
+const int I2C_SCL_PIN = 22;
+
+void lcdShow(const String &l1, const String &l2 = "") {
+  lcd.clear();
+  lcd.setCursor(0,0);
+  lcd.print(l1.substring(0,16));
+  lcd.setCursor(0,1);
+  lcd.print(l2.substring(0,16));
+}
+
+void lcdBoot()      { lcdShow("LSMD-DIU v0.33"); }
+void lcdSleep()     { lcdShow("SLEEP"); }
+void lcdStandby()   { lcdShow("STANDBY"); }
+void lcdPairing()   { lcdShow("PAIRING"); }
+void lcdConnected() { lcdShow("CONNECTED"); }
+void lcdWaiting()   { lcdShow("WAITING"); }
+
+void lcdMeasuring(float v, float vmax) {
+  char L1[17], L2[17];
+  snprintf(L1,16,"CURRENT:%0.2fV",v);
+  snprintf(L2,16,"MAX:    %0.2fV",vmax);
+  lcdShow(L1,L2);
+}
+
+void lcdComplete(float vmax) {
+  char L2[17];
+  snprintf(L2,16,"MAX: %0.2fV",vmax);
+  lcdShow("COMPLETE", L2);
+}
+
+// ---------- Pins ----------
+const int BUTTON_PIN = 25;
+const int ADC_PIN = 34;
+
+// ---------- UUIDs ----------
+#define SERVICE_UUID        "e1c1b100-0001-4fda-9f7b-1234567890ab"
+#define DATA_CHAR_UUID      "e1c1b100-0002-4fda-9f7b-1234567890ab"
+#define CMD_CHAR_UUID       "e1c1b100-0003-4fda-9f7b-1234567890ab"
+#define STATUS_CHAR_UUID    "e1c1b100-0004-4fda-9f7b-1234567890ab"
+#define CMD_NR_CHAR_UUID    "e1c1b100-0005-4fda-9f7b-1234567890ab"
+
+// ---------- Globals ----------
+BLEServer* pServer = nullptr;
+BLECharacteristic* pDataChar = nullptr;
+BLECharacteristic* pStatusChar = nullptr;
+
+volatile bool advertisingStarted = false;
+volatile bool buttonPressedFlag = false;
+
+volatile bool measuring = false;
+volatile bool stopMeasurement = false;
+float measurementDurationSec = 0.0;
+
+volatile bool deviceConnected = false;
+volatile bool oldDeviceConnected = false;
+
+unsigned long lastActivityMillis = 0;
+const unsigned long IDLE_TIMEOUT_MS = 5UL * 60UL * 1000UL;
+
+TaskHandle_t measTaskHandle = NULL;
+
+// ---------- Helpers ----------
+String formatVoltageString(float v) {
+  char buf[16];
+  snprintf(buf, sizeof(buf), "%.2f V", v);
+  return String(buf);
+}
+
+float readVoltage() {
+  uint16_t raw = analogRead(ADC_PIN);
+  int D = raw - 2800;
+  float v = (D * (300/0.02)*(3.3/(125.2*4096)));
+  return v;
+}
+
+void sendStatus(const char* s) {
+  if (pStatusChar) {
+    pStatusChar->setValue((uint8_t*)s, strlen(s));
+    pStatusChar->notify();
+  }
+}
+
+// ---------- Command handler ----------
+void handleCommand(const String &raw) {
+    String s = raw;
+    s.trim();
+    if (s.length() == 0) return;
+
+    lastActivityMillis = millis();
+    Serial.print("Received command: ");
+    Serial.println(s);
+
+    if (s.startsWith("MEAS:") || s.startsWith("meas:") || s.startsWith("Meas:")) {
+
+        String t = s.substring(s.indexOf(':') + 1);
+        float secs = t.toFloat();
+        if (secs <= 0) secs = 1.0;
+
+        measurementDurationSec = secs;
+        stopMeasurement = false;
+
+        if (!measuring) {
+            measuring = true;
+
+            // Measurement task
+            xTaskCreatePinnedToCore(
+                [](void* param)->void {
+                    unsigned long startMs = millis();
+                    unsigned long durationMs = (unsigned long)(measurementDurationSec * 1000.0f);
+
+                    sendStatus("MEAS_START");
+
+                    float vmax = 0.0;
+                    lcdMeasuring(0.0, 0.0);
+
+                    while (!stopMeasurement && (millis() - startMs) < durationMs) {
+                        float v = readVoltage();
+                        String vs = formatVoltageString(v);
+
+                        if (pDataChar) {
+                            pDataChar->setValue((uint8_t*)vs.c_str(), vs.length());
+                            pDataChar->notify();
+                        }
+
+                        if (v > vmax) vmax = v;
+                        lcdMeasuring(v, vmax);
+
+                        vTaskDelay(pdMS_TO_TICKS(200));
+                    }
+
+                    sendStatus("MEAS_COMPLETE");
+                    lcdComplete(vmax);
+
+                    measuring = false;
+                    lastActivityMillis = millis();
+                    vTaskDelete(NULL);
+                },
+                "measTask",
+                4096,
+                NULL,
+                1,
+                &measTaskHandle,
+                1
+            );
+        }
+    }
+    else if (s.equalsIgnoreCase("STOP")) {
+        stopMeasurement = true;
+    }
+    else {
+        sendStatus(s.c_str());
+    }
+}
+
+
+// ---------- BLE Callbacks ----------
+class MyServerCallbacks : public BLEServerCallbacks {
+  void onConnect(BLEServer*) {
+    deviceConnected = true;
+    lastActivityMillis = millis();
+    sendStatus("PAIR_SUCCESS");
+    delay(10);
+    sendStatus("STANDBY");
+
+    lcdConnected();
+    delay(100);
+    lcdWaiting();
+  }
+
+  void onDisconnect(BLEServer*) {
+    deviceConnected = false;
+    lastActivityMillis = millis();
+    pServer->getAdvertising()->start();
+    lcdStandby();
+  }
+};
+
+class CmdCharCallbacks : public BLECharacteristicCallbacks {
+public:
+  void onWrite(BLECharacteristic* pChar) override {
+    handleCommand(pChar->getValue());
+  }
+};
+
+// ---------- Setup ----------
+void setup() {
+  Serial.begin(115200);
+  delay(100);
+
+  Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
+  lcd.init();
+  lcd.backlight();
+  lcdBoot();
+
+  analogReadResolution(12);
+  pinMode(ADC_PIN, INPUT);
+
+  pinMode(BUTTON_PIN, INPUT);
+  attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), [](){
+    buttonPressedFlag = true;
+  }, RISING);
+
+  BLEDevice::init("LSMD-DIU Central");
+  pServer = BLEDevice::createServer();
+  pServer->setCallbacks(new MyServerCallbacks());
+
+  BLEService* pService = pServer->createService(SERVICE_UUID);
+
+  pDataChar = pService->createCharacteristic(
+    DATA_CHAR_UUID, BLECharacteristic::PROPERTY_NOTIFY
+  );
+  pDataChar->addDescriptor(new BLE2902());
+
+  pStatusChar = pService->createCharacteristic(
+    STATUS_CHAR_UUID, BLECharacteristic::PROPERTY_NOTIFY
+  );
+  pStatusChar->addDescriptor(new BLE2902());
+
+  static CmdCharCallbacks cmdHandler;
+
+  BLECharacteristic* pCmdChar =
+    pService->createCharacteristic(CMD_CHAR_UUID, BLECharacteristic::PROPERTY_WRITE);
+  pCmdChar->setCallbacks(&cmdHandler);
+
+  BLECharacteristic* pCmdNRChar =
+    pService->createCharacteristic(CMD_NR_CHAR_UUID, BLECharacteristic::PROPERTY_WRITE_NR);
+  pCmdNRChar->setCallbacks(&cmdHandler);
+
+  pService->start();
+
+  BLEAdvertising* adv = BLEDevice::getAdvertising();
+  adv->addServiceUUID(SERVICE_UUID);
+  adv->setScanResponse(true);
+  adv->setMinPreferred(0x06);
+  adv->setMaxPreferred(0x12);
+
+  advertisingStarted = false;
+
+  Serial.println("ESP32 booted. Waiting for PB press…");
+  lastActivityMillis = millis();
+}
+
+// ---------- Loop ----------
+void loop() {
+
+  if (buttonPressedFlag && !advertisingStarted) {
+    delay(20);
+    if (digitalRead(BUTTON_PIN) == HIGH) {
+      buttonPressedFlag = false;
+      advertisingStarted = true;
+      BLEDevice::getAdvertising()->start();
+      sendStatus("ADVERTISING");
+      lcdPairing();
+    } else {
+      buttonPressedFlag = false;
+    }
+  }
+
+  if (!measuring && !deviceConnected && advertisingStarted) {
+    if (millis() - lastActivityMillis > IDLE_TIMEOUT_MS) {
+      sendStatus("SLEEP");
+      delay(50);
+      lcdSleep();
+      esp_sleep_enable_ext0_wakeup(GPIO_NUM_25, 1);
+      esp_deep_sleep_start();
+    }
+  }
+
+  if (!measuring && deviceConnected) {
+    if (millis() - lastActivityMillis > IDLE_TIMEOUT_MS) {
+      sendStatus("SLEEP");
+      delay(50);
+      pServer->disconnect(0);
+      lcdSleep();
+      esp_sleep_enable_ext0_wakeup(GPIO_NUM_25, 1);
+      esp_deep_sleep_start();
+    }
+  }
+
+  if (deviceConnected && !oldDeviceConnected) {
+    oldDeviceConnected = true;
+    lcdConnected();
+    delay(80);
+    lcdWaiting();
+  }
+
+  if (!deviceConnected && oldDeviceConnected) {
+    oldDeviceConnected = false;
+    lcdStandby();
+  }
+
+  delay(100);
+}
