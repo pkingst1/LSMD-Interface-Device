@@ -2,6 +2,7 @@
 Bluetooth manager - Handles Bluetooth connections using Bleak library
 """
 
+#Add bleak library
 import asyncio
 from bleak import BleakScanner, BleakClient
 from PyQt6.QtCore import QObject, pyqtSignal, QThread
