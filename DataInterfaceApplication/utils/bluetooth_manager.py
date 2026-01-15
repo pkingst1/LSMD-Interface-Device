@@ -9,7 +9,7 @@ from PyQt6.QtCore import QObject, pyqtSignal, QThread
 
 """
 Manages bluetooth connections
-Scanning, connecting, sending/recieving data
+Scanning, connecting, sending/receiving data
 """
 class BluetoothManager(QObject):
 
@@ -31,7 +31,7 @@ class BluetoothManager(QObject):
         self.is_connected = False
 
         #Characteristic UUIDs
-        self.notify_characteristic_uuid = None  #UUID for recieving data
+        self.notify_characteristic_uuid = None  #UUID for receiving data
         self.write_characteristic_uuid = None  #UUID for sending data
     
     #Scan for devices
@@ -133,6 +133,8 @@ class BluetoothManager(QObject):
                 #update
                 self.is_connected = False
                 self.connected_device = None
+                self.notify_characteristic_uuid = None
+                self.write_characteristic_uuid = None
         except Exception as e:
             #still update if fails
             self.is_connected = False
@@ -182,10 +184,14 @@ class BluetoothManager(QObject):
         self.data_received.emit(data)
     
     #called when device disconnects
-    def _on_disconnect(self, client):
-        self.is_connected = False
-        self.connected_device = None
-        self.disconnected.emit()
+    async def _on_disconnect(self, client):
+        if self.auto_reconnect:
+            await self.attempt_reconnect()
+        else:
+            self.is_connected = False
+            self.connected_device = None
+            self.client = None
+            self.disconnected.emit()
     
     #set receiving uuid
     def set_notify_characteristic(self, uuid):
@@ -202,6 +208,7 @@ class BluetoothWorker(QThread):
     connected = pyqtSignal(bool)        #when scan succeeds/fails
     disconnected = pyqtSignal()         #when device disconnects
     error = pyqtSignal(str)             #when error occurs
+    reconnecting = pyqtSignal(int)      #attempt number when reconnecting
 
     def __init__(self):
         super().__init__()
@@ -227,6 +234,14 @@ class BluetoothWorker(QThread):
         #error
         self.manager.error_occurred.connect(self.error.emit)
 
+        self.running = False    #track worker if reconnect needed
+
+        #Auto reconnect settings
+        self.connection_timeout = 5.0
+        self.auto_reconnect = False
+        self.reconnect_attempts = 2
+        self.reconnect_delay = 1.0
+
     #Runs in background
     def run(self):
             
@@ -247,6 +262,7 @@ class BluetoothWorker(QThread):
                 self.loop.run_until_complete(
                     self.manager.connect_to_device(self.params.get('address'))
                 )
+                self.running = True    #program running
                 self.loop.run_forever() #keep loop running once connected
                 self.loop.close()
                 
@@ -270,14 +286,21 @@ class BluetoothWorker(QThread):
 
     #scan for devices
     def scan(self, timeout=10.0):
+        if self.running:
+            self.error.emit("Already running")
+            return
         self.operation = "scan"                 #tell run() to scan
         self.params = {'timeout': timeout}      #store timeout
         self.start()
         
     #connect to a device
     def connect(self, address):
+        if self.running:
+            self.error.emit("Already running")
+            return
         self.operation = "connect"                 #tell run() to connect
         self.params = {'address': address}         #store timeout
+        self.running = True
         self.start()
         
     #disconnect from device
@@ -286,8 +309,46 @@ class BluetoothWorker(QThread):
         if self.loop and self.loop.is_running():
             self._run_in_loop(self.manager.disconnect())
             self.loop.call_soon_threadsafe(self.loop.stop)
+            self.running = False
 
     #send data to device
     def send(self, data):
         #send using event loop
         self._run_in_loop(self.manager.send_data(data))
+
+    #Set connection timeout
+    def set_connection_timeout(self, timeout):
+        self.connection_timeout = timeout
+    
+    #Set auto reconnect enable/disable
+    def set_auto_reconnect_enable(self, enabled):
+        self.auto_reconnect = enabled
+    
+    #Set auto reconnect attempts
+    def set_reconnect_attempts(self, attempts):
+        self.reconnect_attempts = attempts
+    
+    #Set delay between attempts
+    def set_reconnect_delay(self, delay):
+        self.reconnect_delay = delay
+
+    #Attempt reconnect
+    async def attempt_reconnect(self):
+        if self.running and self.auto_reconnect:
+            try:
+                for attempt in range(1, self.reconnect_attempts + 1):
+                    self.reconnecting.emit(attempt)
+                    if attempt > 1:
+                        await self.asyncio.sleep(self.reconnect_delay)
+                    successful = await self.manager.connect_to_device(self.connected_device)
+                    if successful:
+                        return True
+                    else:
+                        return False
+
+            except Exception as e:
+                #if all attempts failed, emit error
+                self.running = False    #stop program
+                self.error.emit(f"Reconnect failed after {self.reconnect_attempts} attempts")
+                self.disconnected.emit()    #signal device disconnected
+                return False    #failed
