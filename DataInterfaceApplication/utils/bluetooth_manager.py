@@ -184,14 +184,10 @@ class BluetoothManager(QObject):
         self.data_received.emit(data)
     
     #called when device disconnects
-    async def _on_disconnect(self, client):
-        if self.auto_reconnect:
-            await self.attempt_reconnect()
-        else:
-            self.is_connected = False
-            self.connected_device = None
-            self.client = None
-            self.disconnected.emit()
+    def _on_disconnect(self, client):
+        self.is_connected = False
+        self.client = None
+        self.disonnected.emit()
     
     #set receiving uuid
     def set_notify_characteristic(self, uuid):
@@ -241,6 +237,7 @@ class BluetoothWorker(QThread):
         self.auto_reconnect = False
         self.reconnect_attempts = 2
         self.reconnect_delay = 1.0
+        self.last_connected_address = None
 
     #Runs in background
     def run(self):
@@ -258,12 +255,20 @@ class BluetoothWorker(QThread):
                 )
                 self.loop.close()    #close loop after scan
             elif self.operation == "connect":
+                address = self.params.get('address')
+                self.last_connected_address = address   #store address for reconnect
                 #run connect operation
-                self.loop.run_until_complete(
+                successful = self.loop.run_until_complete(
                     self.manager.connect_to_device(self.params.get('address'))
                 )
-                self.running = True    #program running
-                self.loop.run_forever() #keep loop running once connected
+                if successful:
+                    self.running = True    #program running
+                    self.loop.run_forever() #keep loop running once connected
+
+                    #if auto reconnect is enabled, attempt reconnect
+                    if self.running and self.auto_reconnect:
+                        self.loop.run_until_complete(self.attempt_reconnect())
+
                 self.loop.close()
                 
         except Exception as e:
@@ -334,17 +339,23 @@ class BluetoothWorker(QThread):
 
     #Attempt reconnect
     async def attempt_reconnect(self):
+        address = self.last_connected_address
+        #if not stored, cannot reconnect
+        if not address:
+            self.error.emit("No connected device to reconnect to")
+            return False
+        
+        #try reconnect
         if self.running and self.auto_reconnect:
             try:
                 for attempt in range(1, self.reconnect_attempts + 1):
                     self.reconnecting.emit(attempt)
                     if attempt > 1:
-                        await self.asyncio.sleep(self.reconnect_delay)
-                    successful = await self.manager.connect_to_device(self.connected_device)
+                        await asyncio.sleep(self.reconnect_delay)
+                    #Retry connection
+                    successful = await self.manager.connect_to_device(self.manager.connected_device)
                     if successful:
                         return True
-                    else:
-                        return False
 
             except Exception as e:
                 #if all attempts failed, emit error

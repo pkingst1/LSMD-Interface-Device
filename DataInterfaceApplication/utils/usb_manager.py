@@ -175,7 +175,7 @@ class USBWorker(QThread):
     disconnected = pyqtSignal()         #when device disconnects
     data_received = pyqtSignal(bytes)   #when data is received
     error = pyqtSignal(str)             #when error occurs
-    reconnecting = pyqtSignal(int)         #attempt number when reconnecting
+    reconnecting = pyqtSignal(int)      #attempt number when reconnecting
 
     def __init__(self):
         super().__init__()
@@ -195,6 +195,7 @@ class USBWorker(QThread):
         self.auto_reconnect = False
         self.reconnect_attempts = 2
         self.reconnect_delay = 1.0
+        self.last_connected_port = None
 
         #Connect manager signals to worker signals
         self.manager.scan_complete.connect(self.scan_complete.emit)
@@ -212,8 +213,10 @@ class USBWorker(QThread):
                 #run scan operation
                 self.manager.scan_devices()
             elif self.operation == "connect":
+                port = self.params.get('port')
+                self.last_connected_port = port   #store port for reconnect
                 #run connect operation
-                successful = self.manager.connect(self.params.get('port'))  #attempt to connect, true if successful
+                successful = self.manager.connect(port)  #attempt to connect, true if successful
                 if successful:
                     self.running = True    #program running
                     self._read_loop()      #start read loop
@@ -252,7 +255,7 @@ class USBWorker(QThread):
     
     #Attempt reconnect
     def attempt_reconnect(self):
-        port = self.manager.connected_device
+        port = self.last_connected_port
         #if not stored, cannot reconnect
         if not port:
             self.error.emit("No connected device to reconnect to")
@@ -294,21 +297,11 @@ class USBWorker(QThread):
 
     #Disconnect from port
     def disconnect(self):
-        self.running = False    #stop program
-        self.manager.disconnect()    #disconnect from port
+        self.running = False               #stop program
+        self.auto_reconnect = False        #disable auto reconnect
+        self.last_connected_port = None    #clear stored port
+        self.manager.disconnect()          #disconnect from port
     
-    #Send data to connected device
-    def send_data(self, data):
-        self.manager.send_data(data)
-
-    #Set connection timeout
-    def set_connection_timeout(self, timeout):
-        self.connection_timeout = timeout
-        self.manager.set_timeout(timeout)
-
-    #Get connection timeout
-    def get_connection_timeout(self):
-        return self.connection_timeout
 
     #Auto reconnect enable/disable
     def set_auto_reconnect(self, enabled):
