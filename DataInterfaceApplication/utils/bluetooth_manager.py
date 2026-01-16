@@ -187,7 +187,7 @@ class BluetoothManager(QObject):
     def _on_disconnect(self, client):
         self.is_connected = False
         self.client = None
-        self.disonnected.emit()
+        self.disconnected.emit()
     
     #set receiving uuid
     def set_notify_characteristic(self, uuid):
@@ -291,7 +291,7 @@ class BluetoothWorker(QThread):
 
     #scan for devices
     def scan(self, timeout=10.0):
-        if self.running:
+        if self.isRunning():
             self.error.emit("Already running")
             return
         self.operation = "scan"                 #tell run() to scan
@@ -300,21 +300,23 @@ class BluetoothWorker(QThread):
         
     #connect to a device
     def connect(self, address):
-        if self.running:
+        if self.isRunning():
             self.error.emit("Already running")
             return
         self.operation = "connect"                 #tell run() to connect
         self.params = {'address': address}         #store timeout
-        self.running = True
         self.start()
         
-    #disconnect from device
+    #planned disconnect from device
     def disconnect_device(self):
         #disconnect and stop event loop
         if self.loop and self.loop.is_running():
+            self.running = False
+            self.auto_reconnect = False
+            self.last_connected_address = None  #clear stored address
             self._run_in_loop(self.manager.disconnect())
             self.loop.call_soon_threadsafe(self.loop.stop)
-            self.running = False
+            
 
     #send data to device
     def send(self, data):
@@ -353,8 +355,10 @@ class BluetoothWorker(QThread):
                     if attempt > 1:
                         await asyncio.sleep(self.reconnect_delay)
                     #Retry connection
-                    successful = await self.manager.connect_to_device(self.manager.connected_device)
+                    successful = await self.manager.connect_to_device(address)
                     if successful:
+                        self.running = True
+                        self.loop.run_forever()
                         return True
 
             except Exception as e:
