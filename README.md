@@ -7,3 +7,4 @@ Python: ver 12.9
 Libraries: 
   Bleak: pip install bleak
   PyQt6: pip install PyQt6
+  Serial: pip install pyserial
