@@ -139,6 +139,8 @@ class BluetoothManager(QObject):
             #still update if fails
             self.is_connected = False
             self.connected_device = None
+            self.notify_characteristic_uuid = None
+            self.write_characteristic_uuid = None
     
     #Send data to connected device
     async def send_data(self, data):
@@ -358,7 +360,6 @@ class BluetoothWorker(QThread):
                     successful = await self.manager.connect_to_device(address)
                     if successful:
                         self.running = True
-                        self.loop.run_forever()
                         return True
 
             except Exception as e:

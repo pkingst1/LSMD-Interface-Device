@@ -119,6 +119,7 @@ class USBManager(QObject):
         except Exception as e:
             error_msg = f"Error sending: {str(e)}"
             self.error_occurred.emit(error_msg)
+            return False
     
     def read_data(self):
         try:
