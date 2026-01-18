@@ -359,12 +359,15 @@ class BluetoothWorker(QThread):
                     #Retry connection
                     successful = await self.manager.connect_to_device(address)
                     if successful:
-                        self.running = True
+                        self.loop.run_forever()    #keep loop running
                         return True
 
             except Exception as e:
                 #if all attempts failed, emit error
-                self.running = False    #stop program
-                self.error.emit(f"Reconnect failed after {self.reconnect_attempts} attempts")
-                self.disconnected.emit()    #signal device disconnected
-                return False    #failed
+                self.error.emit(f"Reconnect error: {str(e)}")
+
+        #All attempts failed
+        self.running = False      
+        self.error.emit(f"Reconnect failed after {self.reconnect_attempts} attempts")
+        self.disconnected.emit()    #signal device disconnected
+        return False    #failed

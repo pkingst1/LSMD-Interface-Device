@@ -18,7 +18,7 @@ class USBManager(QObject):
     scan_complete = pyqtSignal(list)        #list of devices    
     connected = pyqtSignal(str)             #device name
     disconnected = pyqtSignal()             
-    data_received = pyqtSignal(bytes)       #data
+    data_received = pyqtSignal(bytes)        #data
     error_occurred = pyqtSignal(str)         #sends error message
 
     def __init__(self):
@@ -30,7 +30,7 @@ class USBManager(QObject):
         self.is_connected = False
 
         #Serial settings
-        self.baud_rate = 230400  #default, must match PIC rate
+        self.baud_rate = 230400  #default rate, must match PIC rate
         self.timeout = 1
 
     #Scan for USB devices
