@@ -92,7 +92,7 @@ class BluetoothManager(QObject):
             else:
                 raise Exception("Connection Failed.")
             
-        except  Exception as e:
+        except Exception as e:
             error_msg = f"Connection error: {str(e)}"
             self.error_occurred.emit(error_msg)  #error signal
             return False                        #failed
@@ -188,6 +188,8 @@ class BluetoothManager(QObject):
     #called when device disconnects
     def _on_disconnect(self, client):
         self.is_connected = False
+        self.notify_characteristic_uuid = None
+        self.write_characteristic_uuid = None
         self.client = None
         self.disconnected.emit()
     
@@ -267,10 +269,13 @@ class BluetoothWorker(QThread):
                     self.running = True    #program running
                     self.loop.run_forever() #keep loop running once connected
 
-                    #if auto reconnect is enabled, attempt reconnect
-                    if self.running and self.auto_reconnect:
-                        self.loop.run_until_complete(self.attempt_reconnect())
-
+                    #reconnection loop, check for auto reconnect
+                    while self.running and self.auto_reconnect:
+                        reconnected = self.loop.run_until_complete(self.attempt_reconnect())
+                        if reconnected:
+                            self.loop.run_forever()     #keep running after reconnect
+                        else:
+                            break                       #attempts failed, exit reconnect loop
                 self.loop.close()
                 
         except Exception as e:
@@ -306,7 +311,7 @@ class BluetoothWorker(QThread):
             self.error.emit("Already running")
             return
         self.operation = "connect"                 #tell run() to connect
-        self.params = {'address': address}         #store timeout
+        self.params = {'address': address}         #store address
         self.start()
         
     #planned disconnect from device
@@ -359,7 +364,6 @@ class BluetoothWorker(QThread):
                     #Retry connection
                     successful = await self.manager.connect_to_device(address)
                     if successful:
-                        self.loop.run_forever()    #keep loop running
                         return True
 
             except Exception as e:
