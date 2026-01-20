@@ -10,6 +10,7 @@ from PyQt6.QtGui import QFont
 from windows.connection_window import ConnectionWindow
 from windows.device_selection import DeviceSelection
 from windows.data_acquisition import DataAcquisitionWindow
+from windows.data_acquisition_dashboard import DataAcquisitionDashboard
 from utils.bluetooth_manager import BluetoothWorker
 from utils.usb_manager import USBWorker
 
@@ -23,6 +24,9 @@ class LSMDApplication:
         self.connection_window = None
         self.device_selection_window = None
         self.data_acquisition_window = None
+
+        #Track view type
+        self.using_dashboard = True
 
         #Bluetooth worker for connections
         self.bluetooth_worker = None
@@ -125,11 +129,28 @@ class LSMDApplication:
 
     #Show data acquisition window after successful connection
     def show_data_acquisition_window(self):
-        #Create based on connection type
-        if self.connection_type == "bluetooth":
-            self.data_acquisition_window = DataAcquisitionWindow(connection_type="bluetooth", device_address=self.connected_device_address)
+        if self.using_dashboard:
+            #Initialize dashboard view
+            #Create based on connection type
+            if self.connection_type == "bluetooth":
+                self.data_acquisition_window = DataAcquisitionDashboard(connection_type="bluetooth", device_address=self.connected_device_address)
+            else:
+                self.data_acquisition_window = DataAcquisitionDashboard(connection_type="usb", port_name=self.connected_port, baud_rate=self.connected_baud_rate)
+
+            #connect switch view signal
+            self.data_acquisition_window.switch_view.connect(self.on_switch_view)
+        
+        #Debug view
         else:
-            self.data_acquisition_window = DataAcquisitionWindow(connection_type="usb", port_name=self.connected_port, baud_rate=self.connected_baud_rate)
+            #Create based on connection type
+            if self.connection_type == "bluetooth":
+                self.data_acquisition_window = DataAcquisitionWindow(connection_type="bluetooth", device_address=self.connected_device_address)
+            else:
+                self.data_acquisition_window = DataAcquisitionWindow(connection_type="usb", port_name=self.connected_port, baud_rate=self.connected_baud_rate)
+
+            #connect switch view signal
+            self.data_acquisition_window.switch_view.connect(self.on_switch_view)
+
         #Connect signals
         #disconnect
         self.data_acquisition_window.disconnect_request.connect(self.on_disconnect_request)
@@ -137,6 +158,18 @@ class LSMDApplication:
         self.data_acquisition_window.send_data.connect(self.on_send_data)
 
         self.data_acquisition_window.show()
+
+    #Switch view
+    def on_switch_view(self):
+        #Toggle view type
+        self.using_dashboard = not self.using_dashboard
+        #Close current window
+        if self.data_acquisition_window:
+            self.data_acquisition_window.close()
+            self.data_acquisition_window = None
+        
+        #Show dashboard view
+        self.show_data_acquisition_window()
 
     #Data received
     def on_data_received(self, data):

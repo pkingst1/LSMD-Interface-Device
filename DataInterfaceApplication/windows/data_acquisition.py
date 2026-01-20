@@ -15,6 +15,7 @@ class DataAcquisitionWindow(QWidget):
     #Define signals
     disconnect_request = pyqtSignal()
     send_data = pyqtSignal(str)
+    switch_view = pyqtSignal()
 
     def __init__(self, connection_type, device_address=None, port_name=None, baud_rate=None):    #initialize address to None
         super().__init__()
@@ -66,6 +67,13 @@ class DataAcquisitionWindow(QWidget):
 
         top_bar.addWidget(battery_widget)
         top_bar.addStretch(1)
+
+        #Switch view button
+        self.switch_view_button = QPushButton("Switch to Dashboard View")
+        self.switch_view_button.clicked.connect(self.on_switch_view_clicked)
+        top_bar.addWidget(self.switch_view_button)
+        top_bar.addStretch(1)
+    
 
         #Right side
         right_widget = QWidget()
@@ -276,3 +284,6 @@ class DataAcquisitionWindow(QWidget):
     #Disconnect button interaction
     def on_disconnect_clicked(self):
         self.disconnect_request.emit()
+
+    def on_switch_view_clicked(self):
+        self.switch_view.emit()
