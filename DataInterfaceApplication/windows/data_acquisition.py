@@ -16,9 +16,12 @@ class DataAcquisitionWindow(QWidget):
     disconnect_request = pyqtSignal()
     send_data = pyqtSignal(str)
 
-    def __init__(self, device_address=None):    #initialize address to None
+    def __init__(self, connection_type, device_address=None, port_name=None, baud_rate=None):    #initialize address to None
         super().__init__()
+        self.connection_type = connection_type
         self.device_address = device_address
+        self.port_name = port_name
+        self.baud_rate = baud_rate
         self.init_ui()
 
     def init_ui(self):
@@ -71,17 +74,30 @@ class DataAcquisitionWindow(QWidget):
         right_layout.setSpacing(5)
 
         #Connection indicator
-        self.status_indicator = QLabel("Bluetooth Connected")
-        self.status_indicator.setStyleSheet("""
-            QLabel {
-                background-color: #2196F3;
-                color: white;
-                padding: 6px 14px;
-                border-radius: 4px;
-                font-size: 11px;
-                font-weight: 600;
-            }
-        """)
+        if self.connection_type == "bluetooth":
+            self.status_indicator = QLabel("Bluetooth Connected")
+            self.status_indicator.setStyleSheet("""
+                QLabel {
+                    background-color: #2196F3;
+                    color: white;
+                    padding: 6px 14px;
+                    border-radius: 4px;
+                    font-size: 11px;
+                    font-weight: 600;
+                }
+            """)
+        else:
+            self.status_indicator = QLabel("USB Connected")
+            self.status_indicator.setStyleSheet("""
+                QLabel {
+                    background-color: #B2BEB5;
+                    color: white;
+                    padding: 6px 14px;
+                    border-radius: 4px;
+                    font-size: 11px;
+                    font-weight: 600;
+                }
+            """)
         
         #Disconnect button
         self.disconnect_button = QPushButton("Disconnect")

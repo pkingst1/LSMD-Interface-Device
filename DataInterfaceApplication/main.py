@@ -11,6 +11,7 @@ from windows.connection_window import ConnectionWindow
 from windows.device_selection import DeviceSelection
 from windows.data_acquisition import DataAcquisitionWindow
 from utils.bluetooth_manager import BluetoothWorker
+from utils.usb_manager import USBWorker
 
 #Main Application Controller
 class LSMDApplication:
@@ -26,6 +27,14 @@ class LSMDApplication:
         #Bluetooth worker for connections
         self.bluetooth_worker = None
         self.connected_device_address = None
+
+        #USB worker for connections
+        self.usb_worker = None
+        self.connected_port = None
+        self.connected_baud_rate = None
+
+        #Track connection type
+        self.connection_type = None
 
         #Show connection window
         self.show_connection_window()
@@ -48,13 +57,26 @@ class LSMDApplication:
     #USB connection
     def on_usb_connection(self):
         print("USB selected")
+
+        #Show device selection dialog
+        self.device_selection_window = DeviceSelection(connection_type="usb", parent=self.connection_window)
+
+        #Connect the device selected signal to handler
+        self.device_selection_window.usb_device_selected.connect(self.on_usb_device_selected)
+
+        #Block interaction with parent window
+        result = self.device_selection_window.exec()
+
+        #Check if user cancelled
+        if result == DeviceSelection.DialogCode.Rejected:
+            self.connection_window.update_connection_status(None)
     
     #Bluetooth connection
     def on_bluetooth_connection(self):
         print("Bluetooth selected")
 
         #Show device selection dialog
-        self.device_selection_window = DeviceSelection(parent=self.connection_window)
+        self.device_selection_window = DeviceSelection(connection_type="bluetooth",parent=self.connection_window)
         
         #Connect the device selected signal to handler
         self.device_selection_window.device_selected.connect(self.on_device_selected)
@@ -70,6 +92,7 @@ class LSMDApplication:
     def on_device_selected(self, device_address):
         #Store address
         self.connected_device_address = device_address
+        self.connection_type = "bluetooth"
 
         #Check and create Bluetooth worker
         if self.bluetooth_worker is None:
@@ -102,10 +125,11 @@ class LSMDApplication:
 
     #Show data acquisition window after successful connection
     def show_data_acquisition_window(self):
-        #Create data acquisition window
-        self.data_acquisition_window = DataAcquisitionWindow(
-            device_address=self.connected_device_address)
-        
+        #Create based on connection type
+        if self.connection_type == "bluetooth":
+            self.data_acquisition_window = DataAcquisitionWindow(connection_type="bluetooth", device_address=self.connected_device_address)
+        else:
+            self.data_acquisition_window = DataAcquisitionWindow(connection_type="usb", port_name=self.connected_port, baud_rate=self.connected_baud_rate)
         #Connect signals
         #disconnect
         self.data_acquisition_window.disconnect_request.connect(self.on_disconnect_request)
@@ -122,21 +146,28 @@ class LSMDApplication:
     
     #Send data
     def on_send_data(self, data):
-        #check for bluetooth worker, send data
-        if self.bluetooth_worker:
+        #check for connection type and send data
+        if self.connection_type == "bluetooth" and self.bluetooth_worker:
             self.bluetooth_worker.send(data)
+        elif self.connection_type == "usb" and self.usb_worker:
+            self.usb_worker.manager.send_data(data)
     
     #User selects disconnect
     def on_disconnect_request(self):
-        #close bluetooth worker
-        if self.bluetooth_worker:
+        #close worker based on connection type
+        if self.connection_type == "bluetooth" and self.bluetooth_worker:
             self.bluetooth_worker.disconnect_device()
+        elif self.connection_type == "usb" and self.usb_worker:
+            self.usb_worker.disconnect()
         
         #close data acquisition window
         if self.data_acquisition_window:
             self.data_acquisition_window.close()
             self.data_acquisition_window = None
         
+        #Reset connection type
+        self.connection_type = None
+
         #show connection window again
         self.connection_window.show()
         self.connection_window.update_connection_status(None)
@@ -155,6 +186,53 @@ class LSMDApplication:
     #Event loop
     def run(self):
         return self.app.exec()
+
+    #User selects USB device
+    def on_usb_device_selected(self, port_name, baud_rate):
+        #Store port and baud rate
+        self.connected_port = port_name
+        self.connected_baud_rate = baud_rate
+        self.connection_type = "usb"
+
+        #Check and create USB worker
+        if self.usb_worker is None:
+            self.usb_worker = USBWorker()
+
+            #Connect to handler
+            self.usb_worker.connected.connect(self.on_usb_connected)
+            self.usb_worker.disconnected.connect(self.on_usb_disconnected)
+            self.usb_worker.error.connect(self.on_usb_error)
+
+            #Connect data recieved
+            self.usb_worker.data_received.connect(self.on_data_received)
+        
+        #Connection
+        self.usb_worker.manager.set_baud_rate(baud_rate)
+        self.usb_worker.connect(port_name)
+    
+    #USB connection succeeds
+    def on_usb_connected(self, success):
+        if success:
+            print(f"Successfully connected to USB device: {self.connected_port}")
+            #Hide connection window
+            self.connection_window.hide()
+            #Show data acquisition window
+            self.show_data_acquisition_window()
+        else:
+            print("Failed to connect to USB device")
+            #Reset connection
+            self.connection_window.update_connection_status(None)
+
+    #USB disconnects
+    def on_usb_disconnected(self):
+        print(f"USB device disconnected")
+        self.connected_port = None
+        self.connected_baud_rate = None
+        self.connection_window.update_connection_status(None)
+    
+    #USB error
+    def on_usb_error(self, error_message):
+        print(f"USB error: {error_message}")
     
 #Main app
 def main():
