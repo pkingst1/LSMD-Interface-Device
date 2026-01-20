@@ -204,7 +204,7 @@ class LSMDApplication:
             self.usb_worker.error.connect(self.on_usb_error)
 
             #Connect data recieved
-            self.usb_worker.manager.data_received.connect(self.on_data_received)
+            self.usb_worker.data_received.connect(self.on_data_received)
         
         #Connection
         self.usb_worker.manager.set_baud_rate(baud_rate)

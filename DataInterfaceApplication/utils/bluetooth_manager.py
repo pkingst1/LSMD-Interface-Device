@@ -326,6 +326,9 @@ class BluetoothWorker(QThread):
         if self.isRunning():
             self.error.emit("Already running")
             return
+        #Reset for new connection
+        self.running = False
+        self.auto_reconnect = True
         self.operation = "connect"                 #tell run() to connect
         self.params = {'address': address}         #store address
         self.start()
