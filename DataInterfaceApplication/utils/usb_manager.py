@@ -30,7 +30,7 @@ class USBManager(QObject):
         self.is_connected = False
 
         #Serial settings
-        self.baud_rate = 230400  #default rate, must match PIC rate
+        self.baud_rate = 115200 #default rate, must match PIC rate
         self.timeout = 1
 
     #Scan for USB devices
@@ -242,7 +242,7 @@ class USBWorker(QThread):
                     data = self.manager.serial_port.read(waiting)
                     self.data_received.emit(data)    #data received
                 else:
-                    self.usleep(100)    #small delay to avoid high CPU usage
+                    self.msleep(1)    #small delay to avoid high CPU usage
         
             #if error only when unintentional stop
             except Exception as e:

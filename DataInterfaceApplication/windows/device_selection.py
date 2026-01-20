@@ -47,7 +47,7 @@ class DeviceSelection(QDialog):
             self.setWindowTitle("Select Bluetooth Device")
         else:
             self.setWindowTitle("Select USB Device")
-        self.setMinimumHeight(500)
+        self.setMinimumHeight(550)
         self.setMinimumWidth(200)
 
         #Stay on top of parent window
@@ -136,7 +136,7 @@ class DeviceSelection(QDialog):
         #Baud rate selection (USB)
         self.baud_rate_widget = QWidget()
         baud_layout = QVBoxLayout(self.baud_rate_widget)
-        baud_layout.setContentsMargins(0, 0, 0, 0)
+        baud_layout.setContentsMargins(0, 0, 0, 15)
         baud_layout.setSpacing(5)
 
         #Baud rate label
@@ -178,16 +178,17 @@ class DeviceSelection(QDialog):
         #Rates
         baud_rates = ["9600", "19200", "38400", "57600", "115200", "230400", "460800"]
         self.baud_rate_combo.addItems(baud_rates)
-        self.baud_rate_combo.setCurrentText("230400")   #assumed default for PIC
+        self.baud_rate_combo.setCurrentText("115200")   #assumed default for PIC
 
         baud_layout.addWidget(self.baud_rate_combo)
         layout.addWidget(self.baud_rate_widget)
+        self.baud_rate_widget.raise_()
 
         #Only show for USB
         if self.connection_type == "bluetooth":
             self.baud_rate_widget.hide()
 
-        layout.addSpacing(10)
+        layout.addSpacing(25)
 
         #Rescan
         self.scan_button = QPushButton("Rescan for Devices")
@@ -207,8 +208,6 @@ class DeviceSelection(QDialog):
         self.scan_button.clicked.connect(self.start_scan)
         self.scan_button.hide() #show after first scan completes
         layout.addWidget(self.scan_button)
-
-        layout.addStretch(1)
 
         #Connect button
         self.connect_button = QPushButton("Connect to Device")
@@ -286,8 +285,11 @@ class DeviceSelection(QDialog):
         self.device_combo.addItem("Scanning")
         self.connect_button.setEnabled(False)   #disable during scan
 
-        #Start Bluetooth scan, timeout 10 s
-        self.worker.scan(timeout=10.0)
+        #Start scan, no delay for USB
+        if self.connection_type == "bluetooth":
+            self.worker.scan(timeout=10.0)
+        else:
+            self.worker.scan()
 
     #When scan completes
     def on_scan_complete(self, found_devices):
@@ -308,12 +310,19 @@ class DeviceSelection(QDialog):
                 self.device_combo.addItem(display_text)
 
             #Update status
-            self.scan_status_label.setText(f"Found {len(found_devices)} devices")
+            if self.connection_type == "bluetooth":
+                self.scan_status_label.setText(f"Found {len(found_devices)} devices")
+            else:
+                self.scan_status_label.setText(f"Found {len(found_devices)} ports")
             self.connect_button.setEnabled(True)
         #No devices found
         else:
-            self.device_combo.addItem("No devices found - Click 'Rescan'")
-            self.scan_status_label.setText("No devices found")
+            if self.connection_type == "bluetooth":
+                self.device_combo.addItem("No devices found - Click 'Rescan'")
+                self.scan_status_label.setText("No devices found")
+            else:
+                self.device_combo.addItem("No ports found - Click 'Rescan'")
+                self.scan_status_label.setText("No ports found")
             self.connect_button.setEnabled(False)
     
     #On connect to device
@@ -328,8 +337,17 @@ class DeviceSelection(QDialog):
             device_name, device_address = selected
             self.selected_device = device_address
 
-            #signal device address
-            self.device_selected.emit(device_address)
+            #Handle based on connection type
+            if self.connection_type == "bluetooth":
+                #signal device address for bluetooth
+                self.device_selected.emit(device_address)
+            else:
+                #usb baud rate
+                baud_rate = int(self.baud_rate_combo.currentText())
+                #set manager baud rate
+                self.worker.manager.set_baud_rate(baud_rate)
+                #signal device and baud rate for usb
+                self.usb_device_selected.emit(device_address, baud_rate)
 
             #Close dialog
             self.accept()
@@ -348,5 +366,12 @@ class DeviceSelection(QDialog):
         # Update status
         self.scan_status_label.setText("Error occurred - Click 'Rescan'")
 
+    #Get selected device
     def get_selected_device(self):
         return self.selected_device
+    
+    #Get selected baud rate
+    def get_selected_baud_rate(self):
+        if self.connection_type == "usb":
+            return int(self.baud_rate_combo.currentText())
+        return None
