@@ -168,9 +168,9 @@ class DataAcquisitionDashboard(QWidget):
         header_layout.setSpacing(8)
 
         icon_label = QLabel("▶")
-        icon_label.setStyleSheet("color: #1A1A1A; font-size: 14px;")
+        icon_label.setStyleSheet("color: #1A1A1A; font-size: 14px; background: transparent; border: none;")
         title_label = QLabel("Acquisition Control")
-        title_label.setStyleSheet("color: #1A1A1A; font-size: 14px; font-weight: 600;")
+        title_label.setStyleSheet("color: #1A1A1A; font-size: 14px; font-weight: 600; background: transparent; border: none;")
 
         header_layout.addWidget(icon_label)
         header_layout.addWidget(title_label)
