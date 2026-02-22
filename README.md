@@ -8,3 +8,5 @@ Libraries:
   - Bleak: pip install bleak
   - PyQt6: pip install PyQt6
   - Serial: pip install pyserial
+  - NumPy: pip install numpy
+  - Matplotlib: pip install matplotlib
