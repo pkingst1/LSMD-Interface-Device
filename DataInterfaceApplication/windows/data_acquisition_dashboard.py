@@ -7,9 +7,15 @@ Allows for switching with testing data acquisition window
 """
 
 from PyQt6.QtWidgets import (QWidget, QLabel, QPushButton, QVBoxLayout,
-                             QHBoxLayout, QTextEdit, QLineEdit, QScrollArea, QFrame)
+                             QHBoxLayout, QTextEdit, QLineEdit, QScrollArea, QFrame, QGridLayout)
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
+import matplotlib
+matplotlib.use('Qt5Agg')
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
+import numpy as np
+from collections import deque
 
 #Data acquisition dashboard screen
 class DataAcquisitionDashboard(QWidget):
@@ -26,8 +32,19 @@ class DataAcquisitionDashboard(QWidget):
         self.port_name = port_name
         self.baud_rate = baud_rate
         self.is_acquiring = False
+        
+
+        #Data storage for plotting - 10 seconds at 1000Hz = 10,000 points max
+        self.sample_rate = 1000  # Hz
+        self.max_duration = 10   # seconds
+        self.max_data_points = self.sample_rate * self.max_duration
+        self.time_data = deque(maxlen=self.max_data_points)
+        self.force_data = deque(maxlen=self.max_data_points)
+        self.data_point_count = 0
+        self.data_buffer = ""    #Buffer for incomplete data
+        
         self.init_ui()
-    
+
     #Initialize UI
     def init_ui(self):
         self.setWindowTitle("LSMD Data Interface - Data Acquisition Dashboard")
@@ -45,6 +62,7 @@ class DataAcquisitionDashboard(QWidget):
 
         self.create_pager_header(content_layout)
         self.create_acquisition_control(content_layout)
+        self.create_graph_display(content_layout)
         content_layout.addStretch(1)
 
         main_layout.addLayout(content_layout)
@@ -145,7 +163,24 @@ class DataAcquisitionDashboard(QWidget):
 
         layout.addWidget(title)
         layout.addWidget(subtitle)
-    #Acquisition controls
+
+    #Data cards
+    def create_data_cards(self, layout):
+        cards_layout = QHBoxLayout()
+        cards_layout.setSpacing(16)
+        
+        # Card 1: Acquisition Control
+        self.create_acquisition_control_card(cards_layout)
+        
+        # Card 2: placeholder for now
+        self.create_empty_card(cards_layout)
+        
+        # Card 3: placeholder for now
+        self.create_empty_card(cards_layout)
+        
+        layout.addLayout(cards_layout)
+
+    #Acquisition control card
     def create_acquisition_control(self, layout):
         card = QFrame()
         card.setStyleSheet("""
@@ -156,8 +191,7 @@ class DataAcquisitionDashboard(QWidget):
         }
         """)
 
-        card.setFixedWidth(200)
-        card.setFixedHeight(120)
+        card.setMinimumHeight(140)
 
         card_layout = QVBoxLayout(card)
         card_layout.setContentsMargins(16, 16, 16, 16)
@@ -180,7 +214,7 @@ class DataAcquisitionDashboard(QWidget):
 
         #Start stop buttons
         button_layout = QHBoxLayout()
-        button_layout.setSpacing(8)
+        button_layout.setSpacing(0)
 
         self.start_button = QPushButton("Start")
         self.start_button.setCheckable(True)
@@ -199,8 +233,83 @@ class DataAcquisitionDashboard(QWidget):
         button_layout.addWidget(self.stop_button)
 
         card_layout.addLayout(button_layout)
+        card_layout.addStretch(1)
         layout.addWidget(card)
 
+    #Empty placeholder card
+    def create_empty_card(self, layout):
+        card = QFrame()
+        card.setStyleSheet("""
+        QFrame {
+            background-color: #FFFFFF;
+            border: 1px solid #E0E0E0;
+            border-radius: 8px;
+        }
+        """)
+
+        card.setMinimumHeight(140)
+
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(16, 16, 16, 16)
+        card_layout.setSpacing(12)
+        card_layout.addStretch(1)
+        
+        layout.addWidget(card)
+
+    #Graph display
+    def create_graph_display(self, layout):
+        graph_card = QFrame()
+        graph_card.setStyleSheet("""
+        QFrame {
+            background-color: #FFFFFF;
+            border: 1px solid #E0E0E0;
+            border-radius: 8px;
+        }
+        """)
+        
+        graph_layout = QVBoxLayout(graph_card)
+        graph_layout.setContentsMargins(16, 16, 16, 16)
+        graph_layout.setSpacing(12)
+        
+        # Header
+        header_layout = QHBoxLayout()
+        header_layout.setSpacing(8)
+        
+        title_label = QLabel("Force vs Time")
+        title_label.setStyleSheet("color: #1A1A1A; font-size: 14px; font-weight: 600; background: transparent; border: none;")
+        
+        subtitle_label = QLabel("Real-time force measurement display")
+        subtitle_label.setStyleSheet("color: #666666; font-size: 12px; background: transparent; border: none;")
+        
+        header_layout.addWidget(title_label)
+        header_layout.addWidget(subtitle_label)
+        header_layout.addStretch(1)
+        
+        graph_layout.addLayout(header_layout)
+        
+        # Create matplotlib figure
+        self.figure = Figure(figsize=(10, 4), facecolor='white')
+        self.canvas = FigureCanvas(self.figure)
+        self.ax = self.figure.add_subplot(111)
+        
+        # Style the plot
+        self.ax.set_xlabel('Time (s)', fontsize=10, color='#666666')
+        self.ax.set_ylabel('Force (N)', fontsize=10, color='#666666')
+        self.ax.grid(True, alpha=0.2, linestyle='-', linewidth=0.5)
+        self.ax.set_facecolor('#FAFAFA')
+        
+        # Initialize empty plot
+        self.line, = self.ax.plot([], [], color='#2196F3', linewidth=2)
+        self.ax.set_xlim(0, 10)
+        self.ax.set_ylim(0, 1000)
+        
+        self.figure.tight_layout()
+        
+        graph_layout.addWidget(self.canvas)
+        
+        layout.addWidget(graph_card)
+
+    
     #Start clicked
     def on_start_clicked(self):
         if not self.is_acquiring:
@@ -208,6 +317,13 @@ class DataAcquisitionDashboard(QWidget):
             self.start_button.setChecked(True)
             self.stop_button.setChecked(False)
             self.update_button_styles()
+
+            #Clear data
+            self.time_data.clear()
+            self.force_data.clear()
+            self.data_point_count = 0
+
+            #Send start command
             self.send_data.emit("START")
             print("Acquisition started")
     
@@ -218,8 +334,10 @@ class DataAcquisitionDashboard(QWidget):
             self.start_button.setChecked(False)
             self.stop_button.setChecked(True)
             self.update_button_styles()
+
             self.send_data.emit("STOP")
             print("Acquisition stopped")
+            print(f"Data points: {self.data_point_count}")
     
     #Update button styles based on acquisition state
     def update_button_styles(self):
@@ -275,12 +393,67 @@ class DataAcquisitionDashboard(QWidget):
         self.disconnect_request.emit()
         print("Disconnected from device")
     
-    #Data display (placeholder in console for now)
+    #Data display, receive data and updates plot
     def append_data(self, data):
-        #For now, just print to console
+        if not self.is_acquiring:
+            return
+        
+        # Convert bytes to string
         if isinstance(data, bytes):
             try:
                 data = data.decode('utf-8')
             except:
-                data = data.hex()
-        print(f"Received data: {data}")     #Placeholder for data display
+                print(f"Could not decode data: {data}")
+                return
+        
+        # Add to buffer
+        self.data_buffer += data
+        
+        # Process complete lines
+        while '\n' in self.data_buffer:
+            line, self.data_buffer = self.data_buffer.split('\n', 1)
+            line = line.strip()
+            
+            if not line:
+                continue
+            
+            # Check for max duration
+            if self.data_point_count >= self.max_data_points:
+                print(f"Maximum data points reached ({self.max_data_points}). Stopping acquisition.")
+                self.on_stop_clicked()
+                return
+            
+            # Try to parse as float
+            try:
+                force_value = float(line)
+                
+                # Calculate time based on sample rate
+                time_value = self.data_point_count / self.sample_rate
+                
+                self.time_data.append(time_value)
+                self.force_data.append(force_value)
+                self.data_point_count += 1
+                
+                # Update plot every 100 points for performance
+                if self.data_point_count % 100 == 0:
+                    self.update_plot()
+                    
+            except ValueError:
+                print(f"Could not parse: {line}")
+        
+    def update_plot(self):
+        if len(self.time_data) > 0:
+            self.line.set_data(list(self.time_data), list(self.force_data))
+
+            #Auto-scale x-axis as data acquired, max 10 seconds
+            max_time = max(self.time_data)
+            self.ax.set_xlim(0, min(10, max(max_time * 1.1, 1)))
+
+            #Auto-scale y-axis
+            if len(self.force_data) > 0:
+                min_force = min(self.force_data)
+                max_force = max(self.force_data)
+                margin = (max_force - min_force) * 0.1 if max_force > min_force else 100
+                self.ax.set_ylim(max(0, min_force - margin), max_force + margin)
+            
+            self.canvas.draw()
