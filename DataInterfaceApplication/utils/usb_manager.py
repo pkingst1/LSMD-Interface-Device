@@ -110,7 +110,7 @@ class USBManager(QObject):
             
             #convert to bytes
             if isinstance(data, str):
-                data = data.encode('utf-8')
+                data = (data + '\r').encode('utf-8')    #ensure \r termination is sent
             
             #send data
             self.serial_port.write(data)

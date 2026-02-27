@@ -324,7 +324,7 @@ class DataAcquisitionDashboard(QWidget):
             self.data_point_count = 0
 
             #Send start command
-            self.send_data.emit("START\n")
+            self.send_data.emit("start")
             print("Acquisition started")
     
     #Stop clicked
@@ -335,7 +335,7 @@ class DataAcquisitionDashboard(QWidget):
             self.stop_button.setChecked(True)
             self.update_button_styles()
 
-            self.send_data.emit("STOP\n")
+            self.send_data.emit("stop")
             print("Acquisition stopped")
             print(f"Data points: {self.data_point_count}")
     
