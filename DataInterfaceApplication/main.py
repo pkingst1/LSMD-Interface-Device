@@ -11,6 +11,7 @@ from windows.connection_window import ConnectionWindow
 from windows.device_selection import DeviceSelection
 from windows.data_acquisition import DataAcquisitionWindow
 from windows.data_acquisition_dashboard import DataAcquisitionDashboard
+from windows.settings_window import SettingsWindow
 from utils.bluetooth_manager import BluetoothWorker
 from utils.usb_manager import USBWorker
 
@@ -24,6 +25,7 @@ class LSMDApplication:
         self.connection_window = None
         self.device_selection_window = None
         self.data_acquisition_window = None
+        self.settings_window = None
 
         #Track view type
         self.using_dashboard = True
@@ -139,6 +141,7 @@ class LSMDApplication:
 
             #connect switch view signal
             self.data_acquisition_window.switch_view.connect(self.on_switch_view)
+            self.data_acquisition_window.navigate_to_settings.connect(self.on_navigate_to_settings)
         
         #Debug view
         else:
@@ -159,6 +162,42 @@ class LSMDApplication:
 
         self.data_acquisition_window.show()
 
+    #Navigate to settings
+    def on_navigate_to_settings(self):
+        #Hide dashboard, do not destory
+        if self.data_acquisition_window:
+            self.data_acquisition_window.hide()
+
+        #Create settings window with same connections info
+        if self.connection_type == "bluetooth":
+            self.settings_window = SettingsWindow(connection_type="bluetooth", device_address=self.connected_device_address)
+        else:
+            self.settings_window = SettingsWindow(connection_type="usb", port_name=self.connected_port, baud_rate=self.connected_baud_rate)
+        
+        #Connect signals
+        self.settings_window.navigate_to_dashboard.connect(self.on_navigate_to_dashboard)
+        self.settings_window.disconnect_request.connect(self.on_disconnect_request)
+        self.settings_window.filter_enabled.connect(self.on_filter_enabled)
+        self.settings_window.show()
+    
+    #Filter enabled
+    def on_filter_enabled(self, enabled):
+        if enabled and self.data_acquisition_window:
+            filter_instance = None #Implement Alex's filter class here
+            if filter_instance is not None:
+                self.data_acquisition_window.apply_filter(filter_instance)
+        
+    #Navigate back to dashboard
+    def on_navigate_to_dashboard(self):
+        #Close settings window
+        if self.settings_window:
+            self.settings_window.close()
+            self.settings_window = None
+        
+        #Show existing dashboard window
+        if self.data_acquisition_window:
+            self.data_acquisition_window.show()
+    
     #Switch view
     def on_switch_view(self):
         #Toggle view type
