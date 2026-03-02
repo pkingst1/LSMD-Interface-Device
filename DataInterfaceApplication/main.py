@@ -14,6 +14,8 @@ from windows.data_acquisition_dashboard import DataAcquisitionDashboard
 from windows.settings_window import SettingsWindow
 from utils.bluetooth_manager import BluetoothWorker
 from utils.usb_manager import USBWorker
+from utils.moving_average_filter import MovingAverageFilter
+from utils.notch_filter import NotchFilter
 
 #Main Application Controller
 class LSMDApplication:
@@ -183,9 +185,11 @@ class LSMDApplication:
     #Filter enabled
     def on_filter_enabled(self, enabled):
         if enabled and self.data_acquisition_window:
-            filter_instance = None #Implement Alex's filter class here
-            if filter_instance is not None:
-                self.data_acquisition_window.apply_filter(filter_instance)
+            self.data_acquisition_window.apply_filter(NotchFilter(
+                frequency=60.0,
+                bandwidth=5.0,
+                sample_rate=self.data_acquisition_window.sample_rate
+            ))
         
     #Navigate back to dashboard
     def on_navigate_to_dashboard(self):

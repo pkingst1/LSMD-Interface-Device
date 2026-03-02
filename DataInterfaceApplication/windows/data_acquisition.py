@@ -287,17 +287,3 @@ class DataAcquisitionWindow(QWidget):
 
     def on_switch_view_clicked(self):
         self.switch_view.emit()
-
-    #Apply filter to collected data
-    def apply_filter(self, data):
-        if len(self.force_data) == 0:
-            print("No data to filter")
-            return
-        
-        filtered = [filter_instance.process(value) for value in self.force_data]
-
-        self.force_data.clear()
-        self.force_data.extend(filtered)
-
-        self.update_plot()
-        print("Filtered data applied")

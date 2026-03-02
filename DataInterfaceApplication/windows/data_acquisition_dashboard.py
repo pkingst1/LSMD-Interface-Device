@@ -650,3 +650,17 @@ class DataAcquisitionDashboard(QWidget):
                 self.peak_value_label.setText(f"{max_force:.1f} N")
             
             self.canvas.draw()
+    
+    #Apply filter to collected data
+    def apply_filter(self, filter_instance):
+        if len(self.force_data) == 0:
+            print("No data to filter")
+            return
+        
+        filtered = filter_instance.apply(self.force_data)
+
+        self.force_data.clear()
+        self.force_data.extend(filtered)
+
+        self.update_plot()
+        print("Filtered data applied")
