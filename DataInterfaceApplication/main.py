@@ -168,6 +168,7 @@ class LSMDApplication:
     def on_navigate_to_settings(self):
         #Hide dashboard, do not destory
         if self.data_acquisition_window:
+            self._saved_geometry = self.data_acquisition_window.geometry() #Save size
             self.data_acquisition_window.hide()
 
         #Create settings window with same connections info
@@ -180,6 +181,7 @@ class LSMDApplication:
         self.settings_window.navigate_to_dashboard.connect(self.on_navigate_to_dashboard)
         self.settings_window.disconnect_request.connect(self.on_disconnect_request)
         self.settings_window.filter_enabled.connect(self.on_filter_enabled)
+        self.settings_window.setGeometry(self._saved_geometry) #Restore size
         self.settings_window.show()
     
     #Filter enabled
@@ -195,11 +197,13 @@ class LSMDApplication:
     def on_navigate_to_dashboard(self):
         #Close settings window
         if self.settings_window:
+            self._saved_geometry = self.settings_window.geometry() #Save size and location
             self.settings_window.close()
             self.settings_window = None
         
         #Show existing dashboard window
         if self.data_acquisition_window:
+            self.data_acquisition_window.setGeometry(self._saved_geometry) #Restore size and location
             self.data_acquisition_window.show()
     
     #Switch view

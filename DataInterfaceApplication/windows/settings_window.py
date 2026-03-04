@@ -3,7 +3,8 @@ Settings Window - Application and Device Settings
 Preserves connection state between data acquisition window
 """
 from PyQt6.QtWidgets import (QWidget, QLabel, QPushButton, QVBoxLayout,
-                             QHBoxLayout, QFrame)
+                             QHBoxLayout, QFrame, QComboBox, QCheckBox,
+                             QScrollArea)
 from PyQt6.QtCore import Qt, pyqtSignal, QPropertyAnimation, QRect
 from PyQt6.QtGui import QColor, QPainter, QPen, QBrush
 from utils.toggle_switch import ToggleSwitch
@@ -35,16 +36,27 @@ class SettingsWindow(QWidget):
 
         self.create_top_bar(main_layout)
 
-        content_layout = QVBoxLayout()
+        #Scroll area
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll_area.setStyleSheet("background: transparent;")
+
+        scroll_content = QWidget()
+        scroll_content.setStyleSheet("background: transparent;")
+
+
+        content_layout = QVBoxLayout(scroll_content)
         content_layout.setContentsMargins(20, 20, 20, 20)
         content_layout.setSpacing(20)
 
         self.create_pager_header(content_layout)
         self.create_settings_cards(content_layout)
-
         content_layout.addStretch(1)
 
-        main_layout.addLayout(content_layout)
+        scroll_area.setWidget(scroll_content)   
+        main_layout.addWidget(scroll_area)
 
     #Top bar, battery, navigation, connection, disconnect
     def create_top_bar(self, layout):
@@ -234,12 +246,12 @@ class SettingsWindow(QWidget):
         card1.setMinimumHeight(200)
 
         card1_layout = QVBoxLayout(card1)
-        card1_layout.setContentsMargins(16, 16, 16, 16)
-        card1_layout.setSpacing(12)
+        card1_layout.setContentsMargins(16, 12, 16, 16)
+        card1_layout.setSpacing(4)
 
         #Card header
         header_layout = QHBoxLayout()
-        icon_label = QLabel("⚙")
+        icon_label = QLabel("▽")
         icon_label.setStyleSheet("color: #1A1A1A; font-size: 14px; background: transparent; border: none;")
         title_label = QLabel("Filtering")
         title_label.setStyleSheet("color: #1A1A1A; font-size: 14px; font-weight: 600; background: transparent; border: none;")
@@ -249,34 +261,47 @@ class SettingsWindow(QWidget):
         card1_layout.addLayout(header_layout)
 
         #Subtitle
-        subtitle_label = QLabel("Configure signal filtering")
+        subtitle_label = QLabel("Configure signal processing filters for data acquisition")
         subtitle_label.setStyleSheet("color: #666666; font-size: 12px; background: transparent; border: none;")
         card1_layout.addWidget(subtitle_label)
 
-        # Enable Filters row
-        filter_row = QHBoxLayout()
-        filter_row.setContentsMargins(0, 4, 0, 4)
+        card1_layout.addSpacing(6)
 
-        filter_text_layout = QVBoxLayout()
-        filter_text_layout.setSpacing(2)
+        #Filter preset dropdown
+        preset_label = QLabel("Filter Preset:")
+        preset_label.setStyleSheet("color: #1A1A1A; font-size: 12px; font-weight: 500; background: transparent; border: none;")
+        card1_layout.addWidget(preset_label)
 
-        filter_label = QLabel("Enable Filters")
-        filter_label.setStyleSheet("color: #1A1A1A; font-size: 13px; font-weight: 500; background: transparent; border: none;")
-        filter_sublabel = QLabel("Apply filter to data")
-        filter_sublabel.setStyleSheet("color: #888888; font-size: 11px; background: transparent; border: none;")
+        preset_dropdown = QComboBox()
+        preset_dropdown.addItems(["None (Disabled)", "Enable All (Default)", "Custom"])
+        preset_dropdown.setStyleSheet("""
+            QComboBox {
+                color: #1A1A1A;
+                font-size: 12px;
+                padding: 6px 10px;
+                background-color: #F5F5F5;
+                border: 1px solid #E0E0E0;
+                padding: 6px 10px
+            }
+            QComboBox::drop-down {
+                border: none;
+                padding-right: 10px;
+            }
+            QComboBox:: QAbstractItemView {
+                font-size: 12px;
+                border: 1px solid #E0E0E0;
+                selection-background-color: #F5F5F5;
+                selection-color: #1A1A1A;
+        """)
 
-        filter_text_layout.addWidget(filter_label)
-        filter_text_layout.addWidget(filter_sublabel)
+        card1_layout.addWidget(preset_dropdown)
+        card1_layout.addSpacing(6)
 
-        self.filter_toggle = ToggleSwitch()
-        self.filter_toggle.setChecked(False)
-        self.filter_toggle.toggled.connect(self.on_filter_toggled)
+        #Add filter rows
+        card1_layout.addWidget(self.create_filter_rows("Notch Filter", "Attenuate specific frequency noise"))
+        card1_layout.addWidget(self.create_filter_rows("Butterworth Filter", "Low-pass filter for signal smoothing"))
+        card1_layout.addWidget(self.create_filter_rows("Moving Average Filter", "Smooth data using rolling average"))
 
-        filter_row.addLayout(filter_text_layout)
-        filter_row.addStretch(1)
-        filter_row.addWidget(self.filter_toggle)
-
-        card1_layout.addLayout(filter_row)
         card1_layout.addStretch(1)
 
         #Card 3: Empty for now (middle left)
@@ -288,7 +313,7 @@ class SettingsWindow(QWidget):
                 border-radius: 8px;
             }
         """)
-        card3.setMinimumHeight(200)
+        card3.setMinimumHeight(155)
 
         #Card 5: Empty for now (bottom left)
         card5 = QFrame()
@@ -299,7 +324,7 @@ class SettingsWindow(QWidget):
                 border-radius: 8px;
             }
         """)
-        card5.setMinimumHeight(200)
+        card5.setMinimumHeight(155)
 
         #Card2: empty for now (top right)
         card2 = QFrame()
@@ -321,7 +346,7 @@ class SettingsWindow(QWidget):
                 border-radius: 8px;
             }
         """)
-        card4.setMinimumHeight(200)
+        card4.setMinimumHeight(155)
 
         #Card6: empty for now (middle right)
         card6 = QFrame()
@@ -332,7 +357,7 @@ class SettingsWindow(QWidget):
                 border-radius: 8px;
             }
         """)
-        card6.setMinimumHeight(200)
+        card6.setMinimumHeight(155)
 
         left_column.addWidget(card1)
         left_column.addWidget(card3)
@@ -347,10 +372,6 @@ class SettingsWindow(QWidget):
 
         layout.addLayout(main_row)
 
-    #On filter toggle
-    def on_filter_toggled(self, enabled):
-        self.filter_enabled.emit(enabled)
-
     def on_dashboard_clicked(self):
         self.navigate_to_dashboard.emit()
 
@@ -359,3 +380,40 @@ class SettingsWindow(QWidget):
 
     def on_disconnect_clicked(self):
         self.disconnect_request.emit()
+    
+    #Make filter rows function, takes name and subtitle of filter
+    def create_filter_rows(self, name, subtitle):
+        row_widget = QWidget()
+        row_widget.setStyleSheet("background: transparent; border: none;")
+        row_layout = QHBoxLayout(row_widget)
+        row_layout.setContentsMargins(0, 2, 0, 2)
+        row_layout.setSpacing(8)
+
+        text_layout = QVBoxLayout()
+        text_layout.setSpacing(1)
+        name_label = QLabel(name)
+        name_label.setStyleSheet("color: #1A1A1A; font-size: 12px; font-weight: 500; background: transparent; border: none;")
+        sub_label = QLabel(subtitle)
+        sub_label.setStyleSheet("color: #888888; font-size: 11px; background: transparent; border: none;")
+        text_layout.addWidget(name_label)
+        text_layout.addWidget(sub_label)
+
+        checkbox = QCheckBox()
+        checkbox.setStyleSheet("""
+            QCheckBox::indicator {
+                width: 16px;
+                height: 16px;
+                border: 1px solid #CCCCCC;
+                border-radius: 3px;
+                background-color: #FFFFFF;
+            }
+            QCheckBox::indicator:checked {
+                background-color: #1A1A1A;
+                border: 1px solid #1A1A1A;
+            }
+        """)
+
+        row_layout.addLayout(text_layout)
+        row_layout.addStretch(1)
+        row_layout.addWidget(checkbox)
+        return row_widget

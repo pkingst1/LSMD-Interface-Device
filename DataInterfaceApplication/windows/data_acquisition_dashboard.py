@@ -14,6 +14,7 @@ import matplotlib
 matplotlib.use('Qt5Agg')
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+import matplotlib.pyplot as plt
 import numpy as np
 from collections import deque
 import time
@@ -480,8 +481,10 @@ class DataAcquisitionDashboard(QWidget):
         self.ax = self.figure.add_subplot(111)
         
         #Style the plot
-        self.ax.set_xlabel('Time (s)', fontsize=10, color='#666666')
-        self.ax.set_ylabel('Force (N)', fontsize=10, color='#666666')
+        self.ax.set_xlabel('')
+        self.ax.set_ylabel('')
+        self.ax.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f'{x:.1f} s'))
+        self.ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f'{y:.0f} N'))
         self.ax.grid(True, alpha=0.2, linestyle='-', linewidth=0.5)
         self.ax.set_facecolor('#FAFAFA')
         
@@ -490,7 +493,7 @@ class DataAcquisitionDashboard(QWidget):
         self.ax.set_xlim(0, 10)
         self.ax.set_ylim(0, 1000)
         
-        self.figure.subplots_adjust(bottom=0.3, left=0.063, right=0.99, top=0.95)
+        self.figure.subplots_adjust(bottom=0.14, left=0.06, right=0.99, top=0.97)
         
         canvas_widget = QWidget()
         canvas_layout = QVBoxLayout(canvas_widget)
