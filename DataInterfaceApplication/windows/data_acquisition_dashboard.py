@@ -8,7 +8,7 @@ Allows for switching with testing data acquisition window
 
 from PyQt6.QtWidgets import (QWidget, QLabel, QPushButton, QVBoxLayout,
                              QHBoxLayout, QTextEdit, QLineEdit, QScrollArea, QFrame, QGridLayout)
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont
 import matplotlib
 matplotlib.use('Qt5Agg')
@@ -16,6 +16,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import numpy as np
 from collections import deque
+import time
 
 #Data acquisition dashboard screen
 class DataAcquisitionDashboard(QWidget):
@@ -43,6 +44,11 @@ class DataAcquisitionDashboard(QWidget):
         self.force_data = deque(maxlen=self.max_data_points)
         self.data_point_count = 0
         self.data_buffer = ""    #Buffer for incomplete data
+        self.acquisition_start_time = None
+        self.x_axis_max = 1
+        self.acquisition_timer = QTimer()
+        self.acquisition_timer.setSingleShot(True)
+        self.acquisition_timer.timeout.connect(self._on_acquisition_timeout)
         
         self.init_ui()
 
@@ -52,8 +58,8 @@ class DataAcquisitionDashboard(QWidget):
         self.setMinimumSize(1100, 700)
 
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(5, 0, 5, 30)
-        main_layout.setSpacing(15)
+        main_layout.setContentsMargins(0, 0, 0, 30)
+        main_layout.setSpacing(0)
 
         self.create_top_bar(main_layout)
 
@@ -64,14 +70,27 @@ class DataAcquisitionDashboard(QWidget):
         self.create_pager_header(content_layout)
         self.create_data_cards(content_layout)
         self.create_graph_display(content_layout)
+        self.create_stats_cards(content_layout)
         content_layout.addStretch(1)
 
         main_layout.addLayout(content_layout)
 
     #Top bar, battery, switch view, connection, disconnect
     def create_top_bar(self, layout):
-        top_bar = QHBoxLayout()
-        top_bar.setContentsMargins(0, 0, 0, 0)
+        #Row 1: Battery, connection status
+        row1_container = QWidget()
+        row1_container.setStyleSheet("""
+            QWidget {
+                background-color: transparent;
+                border-radius: 0px;
+            }
+        """)
+        row1_container_layout = QVBoxLayout(row1_container)
+        row1_container_layout.setContentsMargins(5, 6, 5, 6)
+        row1_container_layout.setSpacing(0)
+
+        row1 = QHBoxLayout()
+        row1.setContentsMargins(0, 0, 0, 0)
 
         #Battery indicator
         battery_widget = QWidget()
@@ -80,71 +99,17 @@ class DataAcquisitionDashboard(QWidget):
         battery_layout.setSpacing(5)
 
         battery_icon = QLabel("●")
-        battery_icon.setStyleSheet("color: #4CAF50; font-size: 10px;")
+        battery_icon.setStyleSheet("color: #4CAF50; font-size: 11px;")
 
         battery_text = QLabel("Battery: 67%")
-        battery_text.setStyleSheet("color: #666666; font-size: 12px;")
+        battery_text.setStyleSheet("color: #666666; font-size: 11px;")
 
         battery_layout.addWidget(battery_icon)
         battery_layout.addWidget(battery_text)
         battery_widget.setMaximumWidth(150)
 
-        top_bar.addWidget(battery_widget)
-        top_bar.addStretch(1)
-
-        #Navigation ticker (Data Acquisition - Settings)
-        navigation_widget = QWidget()
-        navigation_layout = QHBoxLayout(navigation_widget)
-        navigation_layout.setContentsMargins(0, 0, 0, 0)
-        navigation_layout.setSpacing(0)
-
-        self.dashboard_tab = QPushButton("Dashboard")
-        self.dashboard_tab.setFixedHeight(32)
-        self.dashboard_tab.setStyleSheet("""
-            QPushButton {
-                background-color: #1A1A1A;
-                color: white;
-                border: 1px solid #1A1A1A;
-                border-radius: 6px 0px 0px 6px;
-                padding: 6px 18px;
-                font-size: 12px;
-                font-weight: 500;
-            }
-        """)
-
-        self.settings_tab = QPushButton("Settings")
-        self.settings_tab.setFixedHeight(32)
-        self.settings_tab.setStyleSheet("""
-            QPushButton {
-                background-color: #F5F5F5;
-                color: #666666;
-                border: 1px solid #E0E0E0;
-                border-radius: 0px 6px 6px 0px;
-                padding: 6px 18px;
-                font-size: 12px;
-                font-weight: 500;
-            }
-        """)
-        self.settings_tab.clicked.connect(self.on_settings_clicked)
-
-        navigation_layout.addWidget(self.dashboard_tab)
-        navigation_layout.addWidget(self.settings_tab)
-
-        top_bar.addWidget(navigation_widget)
-        top_bar.addStretch(1)
-        
-        #Switch view button
-        self.switch_view_button = QPushButton("Switch to Debug View")
-        self.switch_view_button.clicked.connect(self.on_switch_view_clicked)
-        top_bar.addWidget(self.switch_view_button)
-        top_bar.addStretch(1)
-
-        #Right side
-        #Right side
-        right_widget = QWidget()
-        right_layout = QVBoxLayout(right_widget)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(5)
+        row1.addWidget(battery_widget)
+        row1.addStretch(1)
 
         #Connection indicator
         if self.connection_type == "bluetooth":
@@ -171,7 +136,80 @@ class DataAcquisitionDashboard(QWidget):
                     font-weight: 600;
                 }
             """)
+
+        row1.addWidget(self.status_indicator)
+
+        #Row 2: Navigation, debug view, disconnect
+        row2_container = QWidget()
+        row2_container.setStyleSheet("""
+            QWidget {
+                background-color: #3A3A3A;
+                border-radius: 0px;
+            }
+        """)
+        row2_container_layout = QVBoxLayout(row2_container)
+        row2_container_layout.setContentsMargins(5, 6, 5, 6)
+        row2_container_layout.setSpacing(0)
+
+        row2 = QHBoxLayout()
+        row2.setContentsMargins(0, 0, 0, 0)
+
+        #Navigation ticker (Data Acquisition - Settings)
+        navigation_widget = QWidget()
+        navigation_layout = QHBoxLayout(navigation_widget)
+        navigation_layout.setContentsMargins(0, 0, 0, 0)
+        navigation_layout.setSpacing(0)
+
+        self.dashboard_tab = QPushButton("Dashboard")
+        self.dashboard_tab.setFixedHeight(32)
+        self.dashboard_tab.setMinimumWidth(100)
+        self.dashboard_tab.setStyleSheet("""
+            QPushButton {
+                background-color: #1A1A1A;
+                color: white;
+                border: 1px solid #1A1A1A;
+                border-radius: 6px 0px 0px 6px;
+                padding: 6px 18px;
+                font-size: 11px;
+                font-weight: 500;
+            }
+        """)
+
+        self.settings_tab = QPushButton("Settings")
+        self.settings_tab.setFixedHeight(32)
+        self.settings_tab.setMinimumWidth(100)
+        self.settings_tab.setStyleSheet("""
+            QPushButton {
+                background-color: #F5F5F5;
+                color: #666666;
+                border: 1px solid #E0E0E0;
+                border-radius: 0px 6px 6px 0px;
+                padding: 6px 18px;
+                font-size: 11px;
+                font-weight: 500;
+            }
+        """)
+        self.settings_tab.clicked.connect(self.on_settings_clicked)
+
+        navigation_layout.addWidget(self.dashboard_tab)
+        navigation_layout.addWidget(self.settings_tab)
+
+        row2.addWidget(navigation_widget)
+        row2.addStretch(1)
         
+        #Switch view button
+        self.switch_view_button = QPushButton("Switch to Debug View")
+        self.switch_view_button.setMinimumHeight(32)
+        self.switch_view_button.setStyleSheet("""
+            QPushButton {
+                font-size: 11px;
+                font-weight: 500;
+            }
+        """)
+        self.switch_view_button.clicked.connect(self.on_switch_view_clicked)
+        row2.addWidget(self.switch_view_button)
+        row2.addStretch(1)
+
         #Disconnect button
         self.disconnect_button = QPushButton("Disconnect")
         self.disconnect_button.setMinimumHeight(32)
@@ -188,23 +226,29 @@ class DataAcquisitionDashboard(QWidget):
         """)
         self.disconnect_button.clicked.connect(self.on_disconnect_clicked)
 
-        right_layout.addWidget(self.status_indicator)
-        right_layout.addWidget(self.disconnect_button)
+        row2.addWidget(self.disconnect_button)
 
-        top_bar.addWidget(right_widget)
-
-        layout.addLayout(top_bar)
+        row1_container_layout.addLayout(row1)
+        row2_container_layout.addLayout(row2)
+        layout.addWidget(row1_container)
+        layout.addWidget(row2_container)
 
     #Pager header
     def create_pager_header(self, layout):
+        header_widget = QWidget()
+        header_layout = QVBoxLayout(header_widget)
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        header_layout.setSpacing(4)
+
         title = QLabel("Data Acquisition Dashboard")
         title.setStyleSheet("font-size: 24px; font-weight: 600;")
 
         subtitle = QLabel("Real-time torque measurement and analysis")
         subtitle.setStyleSheet("font-size: 14px; color: #666666;")
 
-        layout.addWidget(title)
-        layout.addWidget(subtitle)
+        header_layout.addWidget(title)
+        header_layout.addWidget(subtitle)
+        layout.addWidget(header_widget)
 
     #Data cards
     def create_data_cards(self, layout):
@@ -236,10 +280,10 @@ class DataAcquisitionDashboard(QWidget):
         }
         """)
 
-        card.setMinimumHeight(170)
+        card.setMinimumHeight(165)
 
         card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(16, 16, 16, 16)
+        card_layout.setContentsMargins(16, 12, 16, 16)
         card_layout.setSpacing(8)
 
         #Card header
@@ -258,9 +302,6 @@ class DataAcquisitionDashboard(QWidget):
         card_layout.addLayout(header_layout)
 
         #Start stop buttons
-        button_layout = QHBoxLayout()
-        button_layout.setSpacing(0)
-
         self.start_button = QPushButton("Start")
         self.start_button.setCheckable(True)
         self.start_button.setChecked(False)
@@ -274,23 +315,26 @@ class DataAcquisitionDashboard(QWidget):
         #Update button styles based on acquisition state
         self.update_button_styles()
 
-        button_layout.addWidget(self.start_button)
-        button_layout.addWidget(self.stop_button)
-
-        card_layout.addLayout(button_layout)
+        button_container = QWidget()
+        button_container.setStyleSheet("background: transparent; border: none;")
+        button_layout2 = QHBoxLayout(button_container)
+        button_layout2.setSpacing(0)
+        button_layout2.setContentsMargins(0, 0, 0, 0)
+        button_layout2.addWidget(self.start_button)
+        button_layout2.addWidget(self.stop_button)
+        card_layout.addWidget(button_container)
 
         # Clear Data button
         clear_button = QPushButton("Clear Data")
-        clear_button.setMinimumHeight(32)
         clear_button.setStyleSheet("""
             QPushButton {
                 background-color: transparent;
                 color: #666666;
                 border: 1px solid #E0E0E0;
-                border-radius: 4px;
-                padding: 6px 12px;
+                border-radius: 2px;
+                padding: 7px 12px;
                 font-size: 12px;
-                margin-top: 8px;
+                margin: 0px;
             }
         """)
         clear_button.clicked.connect(self.on_clear_data_clicked)
@@ -298,20 +342,20 @@ class DataAcquisitionDashboard(QWidget):
         
         # Export CSV button
         export_button = QPushButton("Export CSV")
-        export_button.setMinimumHeight(32)
         export_button.setStyleSheet("""
             QPushButton {
                 background-color: transparent;
                 color: #666666;
                 border: 1px solid #E0E0E0;
-                border-radius: 4px;
-                padding: 6px 12px;
+                border-radius: 2px;
+                padding: 7px 12px;
                 font-size: 12px;
+                margin: 0px;
             }
         """)
         export_button.clicked.connect(self.on_export_csv_clicked)
+
         card_layout.addWidget(export_button)
-        
         card_layout.addStretch(1)
         
         return card
@@ -326,11 +370,11 @@ class DataAcquisitionDashboard(QWidget):
         }
         """)
 
-        card.setMinimumHeight(170)
+        card.setMinimumHeight(165)
 
         card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(16, 16, 16, 16)
-        card_layout.setSpacing(8)
+        card_layout.setContentsMargins(16, 12, 16, 16)
+        card_layout.setSpacing(0)
 
         #Card header
         header_layout = QHBoxLayout()
@@ -364,14 +408,15 @@ class DataAcquisitionDashboard(QWidget):
             QLabel {
                 background-color: #1A1A1A;
                 color: white;
-                padding: 4px 8px;
-                border-radius: 3px;
-                font-size: 10px;
+                padding: 6px 12px;
+                border-radius: 4px;
+                font-size: 11px;
                 font-weight: 600;
             }
         """)
         self.recording_status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.recording_status_label.setMaximumWidth(80)
+        card_layout.addSpacing(8)
         card_layout.addWidget(self.recording_status_label)
 
         card_layout.addStretch(1)
@@ -389,10 +434,10 @@ class DataAcquisitionDashboard(QWidget):
         }
         """)
 
-        card.setMinimumHeight(170)
+        card.setMinimumHeight(165)
 
         card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(16, 16, 16, 16)
+        card_layout.setContentsMargins(16, 12, 16, 16)
         card_layout.setSpacing(12)
         card_layout.addStretch(1)
         
@@ -410,7 +455,7 @@ class DataAcquisitionDashboard(QWidget):
         """)
         
         graph_layout = QVBoxLayout(graph_card)
-        graph_layout.setContentsMargins(16, 16, 16, 16)
+        graph_layout.setContentsMargins(16, 16, 16, 8)
         graph_layout.setSpacing(12)
         
         #Header
@@ -430,7 +475,7 @@ class DataAcquisitionDashboard(QWidget):
         graph_layout.addLayout(header_layout)
         
         #Create matplotlib figure
-        self.figure = Figure(figsize=(10, 4), facecolor='white')
+        self.figure = Figure(figsize=(10, 8), facecolor='white')
         self.canvas = FigureCanvas(self.figure)
         self.ax = self.figure.add_subplot(111)
         
@@ -445,13 +490,83 @@ class DataAcquisitionDashboard(QWidget):
         self.ax.set_xlim(0, 10)
         self.ax.set_ylim(0, 1000)
         
-        self.figure.tight_layout(pad=2.0)
+        self.figure.subplots_adjust(bottom=0.3, left=0.063, right=0.99, top=0.95)
         
-        graph_layout.addWidget(self.canvas)
+        canvas_widget = QWidget()
+        canvas_layout = QVBoxLayout(canvas_widget)
+        canvas_layout.setContentsMargins(0, 0, 0, 0)
+        canvas_layout.addWidget(self.canvas)
+        graph_layout.addWidget(canvas_widget)
         
         layout.addWidget(graph_card)
 
-    
+    #Stats cards
+    def create_stats_cards(self, layout):
+        stats_layout = QHBoxLayout()
+        stats_layout.setSpacing(16)
+
+        #Card 1: Total data points
+        card1 = QFrame()
+        card1.setStyleSheet("""
+        QFrame {
+            background-color: #FFFFFF;
+            border: 1px solid #E0E0E0;
+            border-radius: 8px;
+        }
+        """)
+        card1_layout = QVBoxLayout(card1)
+        card1_layout.setContentsMargins(16, 12, 16, 12)
+        card1_layout.setSpacing(4)
+        label1 = QLabel("Data Points:")
+        label1.setStyleSheet("color: #666666; font-size: 11px; border: none;")
+        self.stats_data_points = QLabel("0")
+        self.stats_data_points.setStyleSheet("color: #1A1A1A; font-size: 20px; font-weight: 600; border: none;")
+        card1_layout.addWidget(label1)
+        card1_layout.addWidget(self.stats_data_points)
+
+        #Card 2: Total duration
+        card2 = QFrame()
+        card2.setStyleSheet("""
+        QFrame {
+            background-color: #FFFFFF;
+            border: 1px solid #E0E0E0;
+            border-radius: 8px;
+        }
+        """)
+        card2_layout = QVBoxLayout(card2)
+        card2_layout.setContentsMargins(16, 12, 16, 12)
+        card2_layout.setSpacing(4)
+        label2 = QLabel("Duration:")
+        label2.setStyleSheet("color: #666666; font-size: 11px; border: none;")
+        self.stats_duration = QLabel("0.0 s")
+        self.stats_duration.setStyleSheet("color: #1A1A1A; font-size: 20px; font-weight: 600; border: none;")
+        card2_layout.addWidget(label2)
+        card2_layout.addWidget(self.stats_duration)
+
+        #Card 3: Sampling rate (fixed for now)
+        card3 = QFrame()
+        card3.setStyleSheet("""
+        QFrame {
+            background-color: #FFFFFF;
+            border: 1px solid #E0E0E0;
+            border-radius: 8px;
+        }
+        """)
+        card3_layout = QVBoxLayout(card3)
+        card3_layout.setContentsMargins(16, 12, 16, 12)
+        card3_layout.setSpacing(4)
+        label3 = QLabel("Sampling Rate:")
+        label3.setStyleSheet("color: #666666; font-size: 11px; border: none;")
+        self.stats_sample_rate = QLabel(f"{self.sample_rate} Hz")
+        self.stats_sample_rate.setStyleSheet("color: #1A1A1A; font-size: 20px; font-weight: 600; border: none;")
+        card3_layout.addWidget(label3)
+        card3_layout.addWidget(self.stats_sample_rate)
+
+        stats_layout.addWidget(card1, 1)
+        stats_layout.addWidget(card2, 1)
+        stats_layout.addWidget(card3, 1)
+        layout.addLayout(stats_layout)
+
     #Start clicked
     def on_start_clicked(self):
         if not self.is_acquiring:
@@ -464,6 +579,7 @@ class DataAcquisitionDashboard(QWidget):
             self.time_data.clear()
             self.force_data.clear()
             self.data_point_count = 0
+            self.acquisition_start_time = None
 
             #Reset peak value
             self.peak_value_label.setText("0.0 N")
@@ -482,6 +598,8 @@ class DataAcquisitionDashboard(QWidget):
             """)
 
             #Send start command
+            self.x_axis_max = 1 #minimum 1 second display
+            self.acquisition_timer.start(self.max_duration * 1000) #start timer for max duration
             self.send_data.emit("start")
             print("Acquisition started")
     
@@ -506,13 +624,26 @@ class DataAcquisitionDashboard(QWidget):
                 }
             """)
 
+            self.acquisition_timer.stop()
             self.send_data.emit("stop")
             print("Acquisition stopped")
             print(f"Data points: {self.data_point_count}")
     
     #Clear data clicked
     def on_clear_data_clicked(self):
-        print("Clear data button clicked")
+        if not self.is_acquiring:
+            self.time_data.clear()
+            self.force_data.clear()
+            self.data_point_count = 0
+            self.acquisition_start_time = None
+            self.x_axis_max = 1
+            self.peak_value_label.setText("0.0 N")
+            self.line.set_data([], [])
+            self.ax.set_xlim(0, 10)
+            self.ax.set_ylim(0, 1000)
+            self.stats_data_points.setText("0")
+            self.stats_duration.setText("0.0 s")
+            self.canvas.draw()
     
     #Export CSV clicked
     def on_export_csv_clicked(self):
@@ -527,21 +658,21 @@ class DataAcquisitionDashboard(QWidget):
                     background-color: #1A1A1A;
                     color: white;
                     border: none;
-                    border-radius: 6px 0px 0px 6px;
-                    padding: 12px 24px;
+                    border-radius: 2px;
+                    padding: 7px 12px;
                     font-size: 12px;
-                    min-height: 16px;
+                    margin: 0px;
                 }
             """)
             self.stop_button.setStyleSheet("""
                 QPushButton {
                     background-color: #F5F5F5;
                     color: #666666;
-                    border: none;
-                    border-radius: 0px 6px 6px 0px;
-                    padding: 12px 24px;
+                    border: 1px solid #E0E0E0;
+                    border-radius: 2px;
+                    padding: 7px 12px;
                     font-size: 12px;
-                    min-height: 16px;
+                    margin: 0px;
                 }
             """)
         #Not acquiring state
@@ -550,11 +681,11 @@ class DataAcquisitionDashboard(QWidget):
                 QPushButton {
                     background-color: #F5F5F5;
                     color: #666666;
-                    border: none;
-                    border-radius: 6px 0px 0px 6px;
-                    padding: 12px 24px;
+                    border: 1px solid #E0E0E0;
+                    border-radius: 2px;
+                    padding: 7px 12px;
                     font-size: 12px;
-                    min-height: 16px;
+                    margin: 0px;
                 }
             """)
             self.stop_button.setStyleSheet("""
@@ -562,10 +693,10 @@ class DataAcquisitionDashboard(QWidget):
                     background-color: #1A1A1A;
                     color: white;
                     border: none;
-                    border-radius: 0px 6px 6px 0px;
-                    padding: 12px 24px;
+                    border-radius: 2px;
+                    padding: 7px 12px;
                     font-size: 12px;
-                    min-height: 16px;
+                    margin: 0px;
                 }
             """)
     
@@ -607,19 +738,17 @@ class DataAcquisitionDashboard(QWidget):
             if not line:
                 continue
             
-            #Check for max duration
-            if self.data_point_count >= self.max_data_points:
-                print(f"Maximum data points reached ({self.max_data_points}). Stopping acquisition.")
-                self.on_stop_clicked()
-                return
-            
             #Try to parse as float
             try:
                 force_value = float(line)
-                
-                #Calculate time based on sample rate
-                time_value = self.data_point_count / self.sample_rate
-                
+
+                #Set start time on first data point
+                if self.acquisition_start_time is None:
+                    self.acquisition_start_time = time.time()
+
+                #Calculate time since start time
+                time_value = time.time() - self.acquisition_start_time
+
                 self.time_data.append(time_value)
                 self.force_data.append(force_value)
                 self.data_point_count += 1
@@ -630,6 +759,13 @@ class DataAcquisitionDashboard(QWidget):
                     
             except ValueError:
                 print(f"Could not parse: {line}")
+    
+    #Acquisition timeout (10 seconds)
+    def _on_acquisition_timeout(self):
+        self.x_axis_max = self.max_duration
+        self.on_stop_clicked()     #stop acquisition
+        self.update_plot()         #update plot with final data
+        
         
     def update_plot(self):
         if len(self.time_data) > 0:
@@ -637,7 +773,10 @@ class DataAcquisitionDashboard(QWidget):
 
             #Auto-scale x-axis as data acquired, max 10 seconds
             max_time = max(self.time_data)
-            self.ax.set_xlim(0, min(10, max(max_time * 1.1, 1)))
+            if self.is_acquiring:
+                self.x_axis_max = max(max_time, 1)
+            self.ax.set_xlim(0, self.x_axis_max)
+
 
             #Auto-scale y-axis
             if len(self.force_data) > 0:
@@ -648,7 +787,9 @@ class DataAcquisitionDashboard(QWidget):
 
                 #Update peak value
                 self.peak_value_label.setText(f"{max_force:.1f} N")
-            
+
+            self.stats_data_points.setText(str(self.data_point_count))
+            self.stats_duration.setText(f"{max_time:.1f} s")
             self.canvas.draw()
     
     #Apply filter to collected data

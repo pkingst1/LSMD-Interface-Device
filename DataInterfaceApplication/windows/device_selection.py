@@ -47,8 +47,7 @@ class DeviceSelection(QDialog):
             self.setWindowTitle("Select Bluetooth Device")
         else:
             self.setWindowTitle("Select USB Device")
-        self.setMinimumHeight(550)
-        self.setMinimumWidth(200)
+        self.setMinimumSize(550, 550)
 
         #Stay on top of parent window
         #set flag in dialog window for staying on top of others, dialog flag and on top flag added
@@ -183,12 +182,13 @@ class DeviceSelection(QDialog):
         baud_layout.addWidget(self.baud_rate_combo)
         layout.addWidget(self.baud_rate_widget)
         self.baud_rate_widget.raise_()
+        self.baud_rate_widget.setContentsMargins(0, 0, 0, 10)
 
         #Only show for USB
         if self.connection_type == "bluetooth":
             self.baud_rate_widget.hide()
 
-        layout.addSpacing(25)
+        layout.addSpacing(10)
 
         #Rescan
         self.scan_button = QPushButton("Rescan for Devices")

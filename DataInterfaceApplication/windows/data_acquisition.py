@@ -28,7 +28,7 @@ class DataAcquisitionWindow(QWidget):
     def init_ui(self):
         #Initialize UI
         self.setWindowTitle("LSMD Data Interface - Data Acquisition")
-        self.setMinimumSize(800, 500)
+        self.setMinimumSize(1100, 700)
 
         #Main layout
         main_layout = QVBoxLayout(self)
