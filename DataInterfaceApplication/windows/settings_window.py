@@ -14,7 +14,10 @@ class SettingsWindow(QWidget):
     #Define signals
     navigate_to_dashboard = pyqtSignal()
     disconnect_request = pyqtSignal()
-    filter_enabled = pyqtSignal(bool)
+    
+    notch_filter_enabled = pyqtSignal(bool)
+    butterworth_filter_enabled = pyqtSignal(float) #Emits cutoff frequency, 0.0 means disabled
+    moving_average_filter_enabled = pyqtSignal(bool)
 
     def __init__(self, connection_type, device_address=None, port_name=None, baud_rate=None):
         super().__init__()
@@ -281,17 +284,17 @@ class SettingsWindow(QWidget):
                 padding: 6px 10px;
                 background-color: #F5F5F5;
                 border: 1px solid #E0E0E0;
-                padding: 6px 10px
             }
             QComboBox::drop-down {
                 border: none;
                 padding-right: 10px;
             }
-            QComboBox:: QAbstractItemView {
+            QComboBox QAbstractItemView {
                 font-size: 12px;
                 border: 1px solid #E0E0E0;
                 selection-background-color: #F5F5F5;
                 selection-color: #1A1A1A;
+            }
         """)
 
         card1_layout.addWidget(preset_dropdown)
@@ -317,6 +320,11 @@ class SettingsWindow(QWidget):
         self.butterworth_row.checkbox.stateChanged.connect(self.update_filter_preset_dropdown)
         self.moving_average_row.checkbox.stateChanged.connect(self.update_filter_preset_dropdown)
         self.butterworth_row.input_box.textChanged.connect(self.update_filter_preset_dropdown)
+
+        #Connect filter state changes
+        self.notch_row.checkbox.stateChanged.connect(self.on_notch_checkbox_changed)
+        self.butterworth_row.checkbox.stateChanged.connect(self.on_butterworth_checkbox_changed)
+        self.moving_average_row.checkbox.stateChanged.connect(self.on_moving_average_checkbox_changed)
 
         card1_layout.addStretch(1)
 
@@ -517,3 +525,25 @@ class SettingsWindow(QWidget):
         #Unblock signals
         for row in (self.notch_row, self.butterworth_row, self.moving_average_row):
             row.checkbox.blockSignals(False)
+
+    #Filter state changes
+    #Notch filter
+    def on_notch_checkbox_changed(self, state):
+        self.notch_filter_enabled.emit(state == 2) #on state is 2 (checked)
+
+    #Butterworth filter
+    def on_butterworth_checkbox_changed(self, state):
+        if state == 2:  #checked
+            cutoff_text = self.butterworth_row.input_box.text().strip()
+            #Check if valid float, default to 100.0 if invalid
+            try:
+                cutoff = float(cutoff_text) if cutoff_text else 100.0
+            except ValueError:
+                cutoff = 100.0
+            self.butterworth_filter_enabled.emit(cutoff)
+        else:
+            self.butterworth_filter_enabled.emit(0.0)  #0.0 = disabled
+
+    #Moving average filter
+    def on_moving_average_checkbox_changed(self, state):
+        self.moving_average_filter_enabled.emit(state == 2)

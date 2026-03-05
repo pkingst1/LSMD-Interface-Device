@@ -180,18 +180,28 @@ class LSMDApplication:
         #Connect signals
         self.settings_window.navigate_to_dashboard.connect(self.on_navigate_to_dashboard)
         self.settings_window.disconnect_request.connect(self.on_disconnect_request)
-        self.settings_window.filter_enabled.connect(self.on_filter_enabled)
+        self.settings_window.notch_filter_enabled.connect(self.on_notch_filter_changed)
+        self.settings_window.butterworth_filter_enabled.connect(self.on_butterworth_filter_changed)
+        self.settings_window.moving_average_filter_enabled.connect(self.on_moving_average_filter_changed)
         self.settings_window.setGeometry(self._saved_geometry) #Restore size
         self.settings_window.show()
     
-    #Filter enabled
-    def on_filter_enabled(self, enabled):
+    #Notch filter enabled
+    def on_notch_filter_changed(self, enabled):
         if enabled and self.data_acquisition_window:
             self.data_acquisition_window.apply_filter(NotchFilter(
-                frequency=60.0,
-                bandwidth=5.0,
                 sample_rate=self.data_acquisition_window.sample_rate
             ))
+    
+    #Butterworth filter enabled
+    def on_butterworth_filter_changed(self, cutoff):
+        if cutoff > 0.0 and self.data_acquisition_window:
+            pass #TODO: Implement butterworth filter
+
+    #Moving average filter enabled
+    def on_moving_average_filter_changed(self, enabled):
+        if enabled and self.data_acquisition_window:
+            pass #TODO: Implement moving average filter
         
     #Navigate back to dashboard
     def on_navigate_to_dashboard(self):

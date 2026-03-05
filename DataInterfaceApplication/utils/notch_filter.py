@@ -6,14 +6,14 @@ import numpy as np
 
 class NotchFilter:
     #Initialize with frequency to attenuate, bandwidth and sample rate
-    def __init__(self, frequency=60.0, bandwidth=5.0, sample_rate=1000.0):
+    def __init__(self, frequency=60.0, bandwidth=2.0, sample_rate=1000.0):
         self.notch_frequency = frequency
         self.notch_bandwidth = bandwidth
         self.sample_rate = sample_rate
 
     #Compute filter coefficients
-    def _design_notch_filter(self):
-        w0 = 2 * np.pi * self.notch_frequency / self.sample_rate
+    def _design_notch_filter(self, frequency):
+        w0 = 2 * np.pi * frequency / self.sample_rate
         bw = 2 * np.pi * self.notch_bandwidth / self.sample_rate
         r = 1 - (bw / 2)
         cos_w0 = np.cos(w0)
@@ -43,8 +43,13 @@ class NotchFilter:
     #Apply filter to a list/deque of force values, returns filtered list
     def apply(self, force_data):
         data = np.array(list(force_data), dtype=float)
-        b, a = self._design_notch_filter()
-        filtered = self._apply_forward_backward(b, a, data)
+        
+        target_frequencies = [60.0] #change as required, initially was 50, 60, 100, 120, 150, 180
+
+        for freq in target_frequencies:
+            b, a = self._design_notch_filter(freq)
+            filtered = self._apply_forward_backward(b, a, data)
+        
         return filtered.tolist()
 
     def set_notch_freq(self, freq):
