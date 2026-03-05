@@ -6,7 +6,7 @@ import numpy as np
 
 class NotchFilter:
     #Initialize with frequency to attenuate, bandwidth and sample rate
-    def __init__(self, frequency=60.0, bandwidth=2.0, sample_rate=1000.0):
+    def __init__(self, frequency=60.0, bandwidth=5.0, sample_rate=1200.0):
         self.notch_frequency = frequency
         self.notch_bandwidth = bandwidth
         self.sample_rate = sample_rate
@@ -48,9 +48,9 @@ class NotchFilter:
 
         for freq in target_frequencies:
             b, a = self._design_notch_filter(freq)
-            filtered = self._apply_forward_backward(b, a, data)
+            data = self._apply_forward_backward(b, a, data)
         
-        return filtered.tolist()
+        return data.tolist()
 
     def set_notch_freq(self, freq):
         self.notch_frequency = freq

@@ -40,7 +40,7 @@ class DataAcquisitionDashboard(QWidget):
         
 
         #Data storage for plotting - 10 seconds at 1000Hz = 10,000 points max
-        self.sample_rate = 1000  # Hz
+        self.sample_rate = 1200  # Hz
         self.max_duration = 10   # seconds
         self.max_data_points = self.sample_rate * self.max_duration
         self.time_data = deque(maxlen=self.max_data_points)
@@ -782,8 +782,8 @@ class DataAcquisitionDashboard(QWidget):
                 self.force_data.append(force_value)
                 self.data_point_count += 1
                 
-                #Update plot every 100 points
-                if self.data_point_count % 100 == 0:
+                #Update plot every x points
+                if self.data_point_count % 120 == 0:
                     self.update_plot()
                     
             except ValueError:
