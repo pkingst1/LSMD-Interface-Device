@@ -20,16 +20,18 @@ class ConnectionWindow(QWidget):
     def init_ui(self):
         #Initialize UI
         self.setWindowTitle("LSMD Data Interface")
-        self.setMinimumSize(800, 500)
+        self.setMinimumSize(1100, 700)
 
         #Main layout
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(5, 0, 5, 30)
+        main_layout.setContentsMargins(0, 0, 0, 30)
+        main_layout.addSpacing(0)
+        
 
         #Top bar
         self.create_top_bar(main_layout)
-        main_layout.addSpacing(10)
         main_layout.addStretch(2)
+        
 
         #Central content
         central_widget = QWidget()
@@ -58,6 +60,17 @@ class ConnectionWindow(QWidget):
     #Top bar
     def create_top_bar(self, layout):
         #Top bar with battery indicator and connection status
+        row1_container = QWidget()
+        row1_container.setStyleSheet("""
+            QWidget {
+                background-color: transparent;
+                border-radius: 0px;
+            }
+        """)
+        row1_container_layout = QVBoxLayout(row1_container)
+        row1_container_layout.setContentsMargins(5, 6, 5, 6)
+        row1_container_layout.setSpacing(0)
+
         top_bar = QHBoxLayout()
         top_bar.setContentsMargins(0, 0, 0, 0)
 
@@ -68,10 +81,10 @@ class ConnectionWindow(QWidget):
         battery_layout.setSpacing(5)
 
         battery_icon = QLabel("●")
-        battery_icon.setStyleSheet("color: #4CAF50; font-size: 10px;")
+        battery_icon.setStyleSheet("color: #4CAF50; font-size: 11px;")
 
         battery_text = QLabel("Battery: 67%")
-        battery_text.setStyleSheet("color: #666666; font-size: 12px;")
+        battery_text.setStyleSheet("color: #666666; font-size: 11px;")
 
         battery_layout.addWidget(battery_icon)
         battery_layout.addWidget(battery_text)
@@ -92,11 +105,11 @@ class ConnectionWindow(QWidget):
                 font-weight: 600;
             }
         """)
-        #self.status_label.setStyleSheet()
 
         top_bar.addWidget(self.status_label)
 
-        layout.addLayout(top_bar)
+        row1_container_layout.addLayout(top_bar)
+        layout.addWidget(row1_container)
 
     #Header
     def create_header(self, layout):
