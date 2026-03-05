@@ -7,7 +7,8 @@ Allows for switching with testing data acquisition window
 """
 
 from PyQt6.QtWidgets import (QWidget, QLabel, QPushButton, QVBoxLayout,
-                             QHBoxLayout, QTextEdit, QLineEdit, QScrollArea, QFrame, QGridLayout)
+                             QHBoxLayout, QTextEdit, QLineEdit, QScrollArea, QFrame, QGridLayout,
+                             QFileDialog)
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont
 import matplotlib
@@ -18,6 +19,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from collections import deque
 import time
+import pandas as pd
 
 #Data acquisition dashboard screen
 class DataAcquisitionDashboard(QWidget):
@@ -650,7 +652,31 @@ class DataAcquisitionDashboard(QWidget):
     
     #Export CSV clicked
     def on_export_csv_clicked(self):
-        print("Export CSV button clicked")
+        if(len(self.force_data) == 0):
+            print("No data to export")
+            return
+        
+        #Save file dialog (in settings in future)
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save CSV File", #Window title
+            "force_data.csv", #Default file name
+            "CSV Files (*.csv)" #File filter
+        )
+
+        #If closed without selecting file, return
+        if not file_path:
+            return
+        
+        #Dataframe with time time and force data
+        df = pd.DataFrame({
+            "Time (s)": list(self.time_data),
+            "Force (N)": list(self.force_data)}
+        )
+
+        #Write dataframe to CSV
+        df.to_csv(file_path, index=False) #prevent row index
+        print(f"Data exported to {file_path}")
     
     #Update button styles based on acquisition state
     def update_button_styles(self):
