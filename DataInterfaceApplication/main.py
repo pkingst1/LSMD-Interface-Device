@@ -245,6 +245,11 @@ class LSMDApplication:
             self.data_acquisition_window.close()
             self.data_acquisition_window = None
         
+        #close settings window
+        if self.settings_window:
+            self.settings_window.close()
+            self.settings_window = None
+        
         #Reset connection type
         self.connection_type = None
 

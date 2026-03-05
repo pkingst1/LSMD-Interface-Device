@@ -4,7 +4,7 @@ Preserves connection state between data acquisition window
 """
 from PyQt6.QtWidgets import (QWidget, QLabel, QPushButton, QVBoxLayout,
                              QHBoxLayout, QFrame, QComboBox, QCheckBox,
-                             QScrollArea)
+                             QScrollArea, QLineEdit)
 from PyQt6.QtCore import Qt, pyqtSignal, QPropertyAnimation, QRect
 from PyQt6.QtGui import QColor, QPainter, QPen, QBrush
 from utils.toggle_switch import ToggleSwitch
@@ -243,7 +243,7 @@ class SettingsWindow(QWidget):
                 border-radius: 8px;
             }
         """)
-        card1.setMinimumHeight(200)
+        card1.setMinimumHeight(250)
 
         card1_layout = QVBoxLayout(card1)
         card1_layout.setContentsMargins(16, 12, 16, 16)
@@ -295,12 +295,28 @@ class SettingsWindow(QWidget):
         """)
 
         card1_layout.addWidget(preset_dropdown)
+        self.preset_dropdown = preset_dropdown
+        preset_dropdown.currentIndexChanged.connect(self.on_filter_preset_changed)
         card1_layout.addSpacing(6)
 
-        #Add filter rows
-        card1_layout.addWidget(self.create_filter_rows("Notch Filter", "Attenuate specific frequency noise"))
-        card1_layout.addWidget(self.create_filter_rows("Butterworth Filter", "Low-pass filter for signal smoothing"))
-        card1_layout.addWidget(self.create_filter_rows("Moving Average Filter", "Smooth data using rolling average"))
+        #Store checkbox references, create rows
+        self.notch_row = self.create_filter_rows("Notch Filter", "Attenuate specific frequency noise")
+        self.butterworth_row = self.create_filter_rows(
+            "Butterworth Filter", 
+            "Low-pass filter for signal smoothing",
+            is_expandable=True, 
+            param_label="Cutoff (Hz):")
+        self.moving_average_row = self.create_filter_rows("Moving Average Filter", "Smooth data using rolling average")
+
+        card1_layout.addWidget(self.notch_row)
+        card1_layout.addWidget(self.butterworth_row)
+        card1_layout.addWidget(self.moving_average_row)
+
+        #Update dropdown change settings
+        self.notch_row.checkbox.stateChanged.connect(self.update_filter_preset_dropdown)
+        self.butterworth_row.checkbox.stateChanged.connect(self.update_filter_preset_dropdown)
+        self.moving_average_row.checkbox.stateChanged.connect(self.update_filter_preset_dropdown)
+        self.butterworth_row.input_box.textChanged.connect(self.update_filter_preset_dropdown)
 
         card1_layout.addStretch(1)
 
@@ -335,7 +351,7 @@ class SettingsWindow(QWidget):
                 border-radius: 8px;
             }
         """)
-        card2.setMinimumHeight(200)
+        card2.setMinimumHeight(250)
 
         #Card4: empty for now (middle right)
         card4 = QFrame()
@@ -381,8 +397,18 @@ class SettingsWindow(QWidget):
     def on_disconnect_clicked(self):
         self.disconnect_request.emit()
     
-    #Make filter rows function, takes name and subtitle of filter
-    def create_filter_rows(self, name, subtitle):
+    #Make filter rows function, takes name and subtitle of filter, default not expandable (butterworth)
+    def create_filter_rows(self, name, subtitle, is_expandable=False, param_label=None):
+        input_box = None
+
+        #Outer container
+        outer_container = QWidget()
+        outer_container.setStyleSheet("background: transparent; border: none;")
+        outer_container_layout = QVBoxLayout(outer_container)
+        outer_container_layout.setContentsMargins(0, 0, 0, 0)
+        outer_container_layout.setSpacing(2)
+
+        #Main row: name, title, checkbox
         row_widget = QWidget()
         row_widget.setStyleSheet("background: transparent; border: none;")
         row_layout = QHBoxLayout(row_widget)
@@ -416,4 +442,78 @@ class SettingsWindow(QWidget):
         row_layout.addLayout(text_layout)
         row_layout.addStretch(1)
         row_layout.addWidget(checkbox)
-        return row_widget
+        outer_container_layout.addWidget(row_widget)
+
+        if is_expandable and param_label:
+            #Expanding portion to main row
+            label = QLabel(param_label)
+            label.setStyleSheet("color: #1A1A1A; font-size: 11px; background: transparent; border: none;")
+            label.setVisible(False)
+
+            input_box = QLineEdit()
+            input_box.setMinimumWidth(10)
+            input_box.setPlaceholderText("100")
+            input_box.setStyleSheet("""
+                QLineEdit {
+                    background-color: #F5F5F5;
+                    border: 1px solid #E0E0E0;
+                    border-radius: 3px;
+                    padding: 3px 6px;
+                    font-size: 11px;
+                    color: #1A1A1A;
+                }
+            """)
+            input_box.setVisible(False)
+
+            #Insert before checkbox in main row
+            row_layout.insertWidget(2, label)
+            row_layout.insertWidget(3, input_box)
+
+            #Checkbox toggles param row visibility
+            checkbox.stateChanged.connect(label.setVisible)
+            checkbox.stateChanged.connect(input_box.setVisible)
+
+        outer_container.checkbox = checkbox #Store checkbox reference
+
+        #Store input box reference
+        outer_container.input_box = input_box if (is_expandable and param_label) else None
+
+        return outer_container
+
+
+    #Update filter preset dropdown
+    def update_filter_preset_dropdown(self):
+        #Get current filter settings
+        notch_enabled = self.notch_row.checkbox.isChecked()
+        butterworth_enabled = self.butterworth_row.checkbox.isChecked()
+        moving_average_enabled = self.moving_average_row.checkbox.isChecked()
+
+        #Cutoff custom if user input differs from default
+        cutoff_text = self.butterworth_row.input_box.text().strip()
+        cutoff_changed = cutoff_text not in ("", "100")
+
+        #Set dropdown based on current settings
+        all_on = notch_enabled and butterworth_enabled and moving_average_enabled
+        all_off = not notch_enabled and not butterworth_enabled and not moving_average_enabled
+
+        self.preset_dropdown.blockSignals(True)
+        if all_on and not cutoff_changed:
+            self.preset_dropdown.setCurrentIndex(1) #Enable All (Default)
+        elif all_off and not cutoff_changed:
+            self.preset_dropdown.setCurrentIndex(0) #None (Disabled)
+        else:
+            self.preset_dropdown.setCurrentIndex(2) #Custom
+        self.preset_dropdown.blockSignals(False)
+
+    #Filter preset changes
+    def on_filter_preset_changed(self, index):
+        enable = (index == 1)
+        #Block signals so setting doesn't trigger filter preset update
+        for row in (self.notch_row, self.butterworth_row, self.moving_average_row):
+            row.checkbox.blockSignals(True)
+        self.notch_row.checkbox.setChecked(enable)
+        self.butterworth_row.checkbox.setChecked(enable)
+        self.moving_average_row.checkbox.setChecked(enable)
+        #Unblock signals
+        for row in (self.notch_row, self.butterworth_row, self.moving_average_row):
+            row.checkbox.blockSignals(False)
