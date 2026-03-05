@@ -10,3 +10,4 @@ Libraries:
   - Serial: pip install pyserial
   - NumPy: pip install numpy
   - Matplotlib: pip install matplotlib
+  - Pandas: pip install pandas
