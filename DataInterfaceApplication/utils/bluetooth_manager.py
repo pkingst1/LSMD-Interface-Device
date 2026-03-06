@@ -36,11 +36,11 @@ class BluetoothManager(QObject):
     
     #Scan for devices
     #Returns list of devices(name, address)
-    async def scan_devices(self, timeout = 10.0):
+    async def scan_devices(self, timeout = 5.0):
         #Try scanning, error when nothing found
         try:
             self.scan_started.emit()    #scanning began
-            devices = await BleakScanner.discover(timeout=timeout)  #returns device objects after 10 s
+            devices = await BleakScanner.discover(timeout=timeout)  #returns device objects after 5 s
             found_devices = []
 
             #Loop through each device found
@@ -112,8 +112,23 @@ class BluetoothManager(QObject):
             #Run through services
             services = self.client.services
 
+            # =============================================
+            # DEVICE SELECTION: Uncomment ONE block below
+            # =============================================
+
+            #Nordic NRF (NUS)
+            #Only discover from nordic UART service
+            TARGET_SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e"
+
+            #ESP32 peripheral
+            #Uncomment line below and comment line above to use ESP32 peripheral
+            # TARGET_SERVICE_UUID = "4fa4a4aa-0001-4000-8000-000000000000"
+
             #Loop through services and characteristics
             for service in services:
+                #Skip through if not target service
+                if service.uuid != TARGET_SERVICE_UUID:
+                    continue
                 
                 for char in service.characteristics:
                    
@@ -264,7 +279,7 @@ class BluetoothWorker(QThread):
             if self.operation == "scan":
                 #run scan operation
                 self.loop.run_until_complete(
-                    self.manager.scan_devices(self.params.get('timeout', 10.0)) #gets timeout, defaults 10 s
+                    self.manager.scan_devices(self.params.get('timeout',5.0)) #gets timeout, defaults 5 s
                 )
                 self.loop.close()    #close loop after scan
             elif self.operation == "connect":
@@ -304,7 +319,7 @@ class BluetoothWorker(QThread):
         if self.loop and self.loop.is_running():
             future_loop = asyncio.run_coroutine_threadsafe(coroutine, self.loop)
             try:
-                return future_loop.result(timeout=10.0) #wait for result
+                return future_loop.result(timeout=5.0) #wait for result
             except Exception as e:
                 self.error.emit(f"Error within operation: {str(e)}")
                 return None
@@ -313,7 +328,7 @@ class BluetoothWorker(QThread):
             return None
 
     #scan for devices
-    def scan(self, timeout=10.0):
+    def scan(self, timeout=5.0):
         if self.isRunning():
             self.error.emit("Already running")
             return
