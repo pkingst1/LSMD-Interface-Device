@@ -5,7 +5,7 @@ Run this file to start the program
 
 import sys
 from PyQt6.QtWidgets import QApplication
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import (QFont, QPalette, QColor)
 
 from windows.connection_window import ConnectionWindow
 from windows.device_selection import DeviceSelection
@@ -50,6 +50,20 @@ class LSMDApplication:
         font = QFont("Segoe UI", 10)
         self.app.setFont(font)
         self.app.setStyle("Fusion")
+
+        #Override OS theme
+        palette = QPalette()
+        palette.setColor(QPalette.ColorRole.Window, QColor(30, 30, 30))
+        palette.setColor(QPalette.ColorRole.WindowText, QColor(255, 255, 255))
+        palette.setColor(QPalette.ColorRole.Base, QColor(25, 25, 25))
+        palette.setColor(QPalette.ColorRole.AlternateBase, QColor(53, 53, 53))
+        palette.setColor(QPalette.ColorRole.Text, QColor(255, 255, 255))
+        palette.setColor(QPalette.ColorRole.Button, QColor(53, 53, 53))
+        palette.setColor(QPalette.ColorRole.ButtonText, QColor(255, 255, 255))
+        palette.setColor(QPalette.ColorRole.BrightText, QColor(255, 0, 0))
+        palette.setColor(QPalette.ColorRole.Highlight, QColor(42, 130, 218))
+        palette.setColor(QPalette.ColorRole.HighlightedText, QColor(0, 0, 0))
+        self.app.setPalette(palette)
 
     #Connection window screen
     def show_connection_window(self):
