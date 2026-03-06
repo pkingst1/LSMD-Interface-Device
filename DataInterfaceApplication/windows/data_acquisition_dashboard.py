@@ -496,7 +496,7 @@ class DataAcquisitionDashboard(QWidget):
         self.ax.set_xlim(0, 10)
         self.ax.set_ylim(0, 1000)
         
-        self.figure.subplots_adjust(bottom=0.14, left=0.06, right=0.99, top=0.97)
+        self.figure.subplots_adjust(bottom=0.15, left=0.06, right=0.99, top=0.97)
         
         canvas_widget = QWidget()
         canvas_layout = QVBoxLayout(canvas_widget)
