@@ -39,10 +39,11 @@ class DataAcquisitionDashboard(QWidget):
         self.is_acquiring = False
         
 
-        #Data storage for plotting - 10 seconds at 1000Hz = 10,000 points max
+        #Data storage for plotting - 10 seconds at 1200Hz = 12,000 points max
         self.sample_rate = 1200  # Hz
         self.max_duration = 10   # seconds
         self.max_data_points = self.sample_rate * self.max_duration
+        self.raw_force_data = deque(maxlen=self.max_data_points) #unfiltered force data
         self.time_data = deque(maxlen=self.max_data_points)
         self.force_data = deque(maxlen=self.max_data_points)
         self.data_point_count = 0
@@ -583,6 +584,7 @@ class DataAcquisitionDashboard(QWidget):
             #Clear data
             self.time_data.clear()
             self.force_data.clear()
+            self.raw_force_data.clear()
             self.data_point_count = 0
             self.acquisition_start_time = None
 
@@ -639,6 +641,7 @@ class DataAcquisitionDashboard(QWidget):
         if not self.is_acquiring:
             self.time_data.clear()
             self.force_data.clear()
+            self.raw_force_data.clear()
             self.data_point_count = 0
             self.acquisition_start_time = None
             self.x_axis_max = 1
@@ -780,6 +783,7 @@ class DataAcquisitionDashboard(QWidget):
 
                 self.time_data.append(time_value)
                 self.force_data.append(force_value)
+                self.raw_force_data.append(force_value)
                 self.data_point_count += 1
                 
                 #Update plot every x points
@@ -821,16 +825,19 @@ class DataAcquisitionDashboard(QWidget):
             self.stats_duration.setText(f"{max_time:.1f} s")
             self.canvas.draw()
     
-    #Apply filter to collected data
-    def apply_filter(self, filter_instance):
-        if len(self.force_data) == 0:
-            print("No data to filter")
+    #Apply ordered list of filters to raw data, or revert if list is empty
+    def apply_filter(self, filter_list):
+        if len(self.raw_force_data) == 0:
             return
-        
-        filtered = filter_instance.apply(self.force_data)
+
+        # Start from raw data
+        filtered = list(self.raw_force_data)
+
+        # Apply each filter in order (notch, butterworth, moving average)
+        for f in filter_list:
+            filtered = f.apply(filtered)
 
         self.force_data.clear()
         self.force_data.extend(filtered)
 
         self.update_plot()
-        print("Filtered data applied")
