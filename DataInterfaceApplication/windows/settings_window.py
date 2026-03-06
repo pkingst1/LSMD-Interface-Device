@@ -239,6 +239,7 @@ class SettingsWindow(QWidget):
         right_column.setSpacing(16)
 
         #Card 1: Filtering (top right)
+        #TODO: set to separate function
         card1 = QFrame()
         card1.setStyleSheet("""
             QFrame {
@@ -331,15 +332,7 @@ class SettingsWindow(QWidget):
         card1_layout.addStretch(1)
 
         #Card 3: Empty for now (middle left)
-        card3 = QFrame()
-        card3.setStyleSheet("""
-            QFrame {
-                background-color: #FFFFFF;
-                border: 1px solid #1A1A1A;
-                border-radius: 8px;
-            }
-        """)
-        card3.setMinimumHeight(155)
+        card3 = self.create_measurement_settings_card()
 
         #Card 5: Empty for now (bottom left)
         card5 = QFrame()
@@ -372,7 +365,7 @@ class SettingsWindow(QWidget):
                 border-radius: 8px;
             }
         """)
-        card4.setMinimumHeight(155)
+        card4.setMinimumHeight(260)
 
         #Card6: empty for now (middle right)
         card6 = QFrame()
@@ -561,3 +554,145 @@ class SettingsWindow(QWidget):
             filters.append(MovingAverageFilter())
 
         return filters
+    
+    #Create 3rd card: measurement settings
+    def create_measurement_settings_card(self):
+        card = QFrame()
+        card.setStyleSheet("""
+            QFrame {
+                background-color: #FFFFFF;
+                border: 1px solid #E0E0E0;
+                border-radius: 8px;
+            }
+        """)
+        card.setMinimumHeight(260)
+
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(16, 12, 16, 16)
+        card_layout.setSpacing(6)
+
+        #Card header
+        header_layout = QHBoxLayout()
+        icon_label = QLabel("◎")
+        icon_label.setStyleSheet("color: #1A1A1A; font-size: 14px; background: transparent; border: none;")
+        title_label = QLabel("Measurement Settings")
+        title_label.setStyleSheet("color: #1A1A1A; font-size: 14px; font-weight: 600; background: transparent; border: none;")
+        header_layout.addWidget(icon_label)
+        header_layout.addWidget(title_label)
+        header_layout.addStretch(1)
+        card_layout.addLayout(header_layout)
+
+        #Subtitle
+        subtitle_label = QLabel("Configure measurement parameters for torque calculations")
+        subtitle_label.setStyleSheet("color: #666666; font-size: 12px; background: transparent; border: none;")
+        card_layout.addWidget(subtitle_label)
+
+        #Limb length input
+        limb_label = QLabel("Limb Length")
+        limb_label.setStyleSheet("color: #1A1A1A; font-size: 12px; font-weight: 500; background: transparent; border: none;")
+        card_layout.addWidget(limb_label)
+
+        limb_row = QHBoxLayout()
+        limb_row.setContentsMargins(0, 0, 0, 0)
+        limb_row.setSpacing(8)
+
+        self.limb_length_input = QLineEdit("50")
+        self.limb_length_input.setStyleSheet("""
+            QLineEdit {
+                background-color: #F5F5F5;
+                border: 1px solid #E0E0E0;
+                border-radius: 3px;
+                padding: 6px 10px;
+                font-size: 12px;
+                color: #1A1A1A;
+            }
+        """)
+        self.limb_length_input.editingFinished.connect(self.on_limb_length_changed)
+
+        limb_unit = QComboBox()
+        limb_unit.addItem("cm")
+        limb_unit.setEnabled(False)
+        limb_unit.setStyleSheet("""
+            QComboBox {
+                color: #1A1A1A;
+                font-size: 12px;
+                padding: 6px 10px;
+                background-color: #F5F5F5;
+                border: 1px solid #E0E0E0;
+            }
+            QComboBox::drop-down {
+                border: none;
+                padding-right: 10px;
+            }
+        """)
+        limb_unit.setMinimumWidth(70)
+
+        limb_row.addWidget(self.limb_length_input)
+        limb_row.addWidget(limb_unit)
+        card_layout.addLayout(limb_row)
+
+        limb_desc = QLabel("Distance from joint center to force application point")
+        limb_desc.setStyleSheet("color: #888888; font-size: 11px; background: transparent; border: none;")
+        card_layout.addWidget(limb_desc)
+
+        # Force Units
+        force_label = QLabel("Force Units")
+        force_label.setStyleSheet("color: #1A1A1A; font-size: 12px; font-weight: 500; background: transparent; border: none;")
+        card_layout.addWidget(force_label)
+
+        force_dropdown = QComboBox()
+        force_dropdown.addItem("Newtons (N) (Fixed)")
+        force_dropdown.setEnabled(False)
+        force_dropdown.setStyleSheet("""
+            QComboBox {
+                color: #666666;
+                font-size: 12px;
+                padding: 6px 10px;
+                background-color: #F5F5F5;
+                border: 1px solid #E0E0E0;
+            }
+            QComboBox::drop-down {
+                border: none;
+                padding-right: 10px;
+            }
+        """)
+        card_layout.addWidget(force_dropdown)
+
+        card_layout.addSpacing(6)
+
+        # Torque Units
+        torque_label = QLabel("Torque Units")
+        torque_label.setStyleSheet("color: #1A1A1A; font-size: 12px; font-weight: 500; background: transparent; border: none;")
+        card_layout.addWidget(torque_label)
+
+        torque_dropdown = QComboBox()
+        torque_dropdown.addItem("Newton-meters (N·m) (Fixed)")
+        torque_dropdown.setEnabled(False)
+        torque_dropdown.setStyleSheet("""
+            QComboBox {
+                color: #666666;
+                font-size: 12px;
+                padding: 6px 10px;
+                background-color: #F5F5F5;
+                border: 1px solid #E0E0E0;
+            }
+            QComboBox::drop-down {
+                border: none;
+                padding-right: 10px;
+            }
+        """)
+        card_layout.addWidget(torque_dropdown)
+
+        card_layout.addStretch(1)
+
+        return card
+    
+    #Limb length changed
+    def on_limb_length_changed(self):
+        text = self.limb_length_input.text().strip()
+        try:
+            value = float(text)
+            if value <= 0:
+                raise ValueError
+        except ValueError:
+            self.limb_length_input.setText("50")
