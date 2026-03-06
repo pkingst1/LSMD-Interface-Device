@@ -14,8 +14,6 @@ from windows.data_acquisition_dashboard import DataAcquisitionDashboard
 from windows.settings_window import SettingsWindow
 from utils.bluetooth_manager import BluetoothWorker
 from utils.usb_manager import USBWorker
-from utils.moving_average_filter import MovingAverageFilter
-from utils.notch_filter import NotchFilter
 
 #Main Application Controller
 class LSMDApplication:
@@ -123,6 +121,7 @@ class LSMDApplication:
 
             #hide connection window
             self.connection_window.hide()
+            self._saved_geometry = self.connection_window.geometry() #Save size
             #show data acquisition window
             self.show_data_acquisition_window()
 
@@ -163,6 +162,7 @@ class LSMDApplication:
         self.data_acquisition_window.send_data.connect(self.on_send_data)
 
         self.data_acquisition_window.show()
+        self.data_acquisition_window.setGeometry(self._saved_geometry) #Restore size
 
     #Navigate to settings
     def on_navigate_to_settings(self):
@@ -171,49 +171,42 @@ class LSMDApplication:
             self._saved_geometry = self.data_acquisition_window.geometry() #Save size
             self.data_acquisition_window.hide()
 
-        #Create settings window with same connections info
-        if self.connection_type == "bluetooth":
-            self.settings_window = SettingsWindow(connection_type="bluetooth", device_address=self.connected_device_address)
-        else:
-            self.settings_window = SettingsWindow(connection_type="usb", port_name=self.connected_port, baud_rate=self.connected_baud_rate)
+        #Create settings window only if not already created
+        if self.settings_window is None:
+            if self.connection_type == "bluetooth":
+                self.settings_window = SettingsWindow(connection_type="bluetooth", device_address=self.connected_device_address)
+            else:
+                self.settings_window = SettingsWindow(connection_type="usb", port_name=self.connected_port, baud_rate=self.connected_baud_rate)
         
-        #Connect signals
-        self.settings_window.navigate_to_dashboard.connect(self.on_navigate_to_dashboard)
-        self.settings_window.disconnect_request.connect(self.on_disconnect_request)
-        self.settings_window.notch_filter_enabled.connect(self.on_notch_filter_changed)
-        self.settings_window.butterworth_filter_enabled.connect(self.on_butterworth_filter_changed)
-        self.settings_window.moving_average_filter_enabled.connect(self.on_moving_average_filter_changed)
+            #Connect signals once only
+            self.settings_window.navigate_to_dashboard.connect(self.on_navigate_to_dashboard)
+            self.settings_window.disconnect_request.connect(self.on_disconnect_request)
+            self.settings_window.filter_settings_changed.connect(self.on_filter_settings_changed)
+
         self.settings_window.setGeometry(self._saved_geometry) #Restore size
         self.settings_window.show()
     
-    #Notch filter enabled
-    def on_notch_filter_changed(self, enabled):
-        if enabled and self.data_acquisition_window:
-            self.data_acquisition_window.apply_filter(NotchFilter(
-                sample_rate=self.data_acquisition_window.sample_rate
-            ))
-    
-    #Butterworth filter enabled
-    def on_butterworth_filter_changed(self, cutoff):
-        if cutoff > 0.0 and self.data_acquisition_window:
-            pass #TODO: Implement butterworth filter
-
-    #Moving average filter enabled
-    def on_moving_average_filter_changed(self, enabled):
-        if enabled and self.data_acquisition_window:
-            pass #TODO: Implement moving average filter
+    #Filter settings changed
+    def on_filter_settings_changed(self):
+        if self.settings_window and self.data_acquisition_window:
+            filters = self.settings_window.get_active_filters(
+            self.data_acquisition_window.sample_rate
+            )
+        self.data_acquisition_window.apply_filter(filters)
         
     #Navigate back to dashboard
     def on_navigate_to_dashboard(self):
-        #Close settings window
+        #Gide settings window
         if self.settings_window:
             self._saved_geometry = self.settings_window.geometry() #Save size and location
-            self.settings_window.close()
-            self.settings_window = None
+            self.settings_window.hide()
+        
+        #Re-apply filter state before showing dashboard
+        self.on_filter_settings_changed()
         
         #Show existing dashboard window
         if self.data_acquisition_window:
-            self.data_acquisition_window.setGeometry(self._saved_geometry) #Restore size and location
+            self._saved_geometry = self.data_acquisition_window.geometry() #Save size and location
             self.data_acquisition_window.show()
     
     #Switch view
@@ -244,7 +237,13 @@ class LSMDApplication:
     
     #User selects disconnect
     def on_disconnect_request(self):
-        #close worker based on connection type
+        #Save geometry of current visible window
+        if self.data_acquisition_window:
+            self._saved_geometry = self.data_acquisition_window.geometry()
+        elif self.settings_window:
+            self._saved_geometry = self.settings_window.geometry()
+
+        #Close worker based on connection type
         if self.connection_type == "bluetooth" and self.bluetooth_worker:
             self.bluetooth_worker.disconnect_device()
         elif self.connection_type == "usb" and self.usb_worker:
@@ -263,7 +262,8 @@ class LSMDApplication:
         #Reset connection type
         self.connection_type = None
 
-        #show connection window again
+        #Show connection window again and restore geometry
+        self.connection_window.setGeometry(self._saved_geometry)
         self.connection_window.show()
         self.connection_window.update_connection_status(None)
 
@@ -311,6 +311,7 @@ class LSMDApplication:
             print(f"Successfully connected to USB device: {self.connected_port}")
             #Hide connection window
             self.connection_window.hide()
+            self._saved_geometry = self.connection_window.geometry() #Save size
             #Show data acquisition window
             self.show_data_acquisition_window()
         else:
