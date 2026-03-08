@@ -11,11 +11,7 @@ from PyQt6.QtWidgets import (QWidget, QLabel, QPushButton, QVBoxLayout,
                              QFileDialog)
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont
-import matplotlib
-matplotlib.use('Qt5Agg')
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.figure import Figure
-import matplotlib.pyplot as plt
+import pyqtgraph as pg
 import numpy as np
 from collections import deque
 import time
@@ -478,30 +474,40 @@ class DataAcquisitionDashboard(QWidget):
         
         graph_layout.addLayout(header_layout)
         
-        #Create matplotlib figure
-        self.figure = Figure(figsize=(10, 8), facecolor='white')
-        self.canvas = FigureCanvas(self.figure)
-        self.ax = self.figure.add_subplot(111)
+        #Create pyqtgraph plot widget
+        self.plot_widget = pg.PlotWidget()
+        self.plot_widget.setBackground('#FAFAFA')
+        self.plot_widget.showGrid(x=True, y=True, alpha=0.2)
+
+        #Set axis labels
+        self.plot_widget.setLabel('bottom', '')
+        self.plot_widget.setLabel('left', '')
         
-        #Style the plot
-        self.ax.set_xlabel('')
-        self.ax.set_ylabel('')
-        self.ax.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f'{x:.1f} s'))
-        self.ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f'{y:.0f} N'))
-        self.ax.grid(True, alpha=0.2, linestyle='-', linewidth=0.5)
-        self.ax.set_facecolor('#FAFAFA')
+        #Format tick labels
+        self.plot_widget.getAxis('bottom').setStyle(tickTextOffset=5)
+        self.plot_widget.getAxis('left').setStyle(tickTextOffset=5)
+
+        #Custom tick labels for units
+        self.plot_widget.getAxis('left').tickStrings = lambda values, scale, spacing: [f"{v:.0f} N" for v in values]
         
-        #Initialize empty plot
-        self.line, = self.ax.plot([], [], color='#2196F3', linewidth=2)
-        self.ax.set_xlim(0, 10)
-        self.ax.set_ylim(0, 1000)
+        self.plot_widget.setLimits(xMin=0)
         
-        self.figure.subplots_adjust(bottom=0.15, left=0.06, right=0.99, top=0.97)
+        #Disable mouse interaction (pan, zoom)
+        self.plot_widget.setMouseEnabled(x=False, y=False)
+        self.plot_widget.setMenuEnabled(False)
+        
+        #Create plot line
+        self.line = self.plot_widget.plot([], [], pen=pg.mkPen(color='#2196F3', width=2))
+
+        #Set initial ranges
+        #self.plot_widget.setXRange(0, 10, padding=0)
+        self.plot_widget.setYRange(0, 1000, padding=0)
+        QTimer.singleShot(0, lambda: self.update_time_ticks(10))    #Update time ticks after initial layout
         
         canvas_widget = QWidget()
         canvas_layout = QVBoxLayout(canvas_widget)
         canvas_layout.setContentsMargins(0, 0, 0, 0)
-        canvas_layout.addWidget(self.canvas)
+        canvas_layout.addWidget(self.plot_widget)
         graph_layout.addWidget(canvas_widget)
         
         layout.addWidget(graph_card)
@@ -646,12 +652,12 @@ class DataAcquisitionDashboard(QWidget):
             self.acquisition_start_time = None
             self.x_axis_max = 1
             self.peak_value_label.setText("0.0 N")
-            self.line.set_data([], [])
-            self.ax.set_xlim(0, 10)
-            self.ax.set_ylim(0, 1000)
+            self.line.setData([], [])
+            #self.plot_widget.setXRange(0, 10, padding=0)
+            self.plot_widget.setYRange(0, 1000)
+            self.update_time_ticks(10)
             self.stats_data_points.setText("0")
             self.stats_duration.setText("0.0 s")
-            self.canvas.draw()
     
     #Export CSV clicked
     def on_export_csv_clicked(self):
@@ -774,20 +780,16 @@ class DataAcquisitionDashboard(QWidget):
             try:
                 force_value = float(line)
 
-                #Set start time on first data point
-                if self.acquisition_start_time is None:
-                    self.acquisition_start_time = time.time()
-
-                #Calculate time since start time
-                time_value = time.time() - self.acquisition_start_time
+                #Calculate time from sample count
+                time_value = self.data_point_count / self.sample_rate
 
                 self.time_data.append(time_value)
                 self.force_data.append(force_value)
                 self.raw_force_data.append(force_value)
                 self.data_point_count += 1
-                
-                #Update plot every x points
-                if self.data_point_count % 120 == 0:
+
+                #Update plot every 60 points (~50ms at 1200 Hz)
+                if self.data_point_count % 60 == 0:
                     self.update_plot()
                     
             except ValueError:
@@ -802,13 +804,14 @@ class DataAcquisitionDashboard(QWidget):
         
     def update_plot(self):
         if len(self.time_data) > 0:
-            self.line.set_data(list(self.time_data), list(self.force_data))
+            self.line.setData(list(self.time_data), list(self.force_data))
 
             #Auto-scale x-axis as data acquired, max 10 seconds
             max_time = max(self.time_data)
             if self.is_acquiring:
                 self.x_axis_max = max(max_time, 1)
-            self.ax.set_xlim(0, self.x_axis_max)
+            #self.plot_widget.setXRange(0, self.x_axis_max, padding=0)
+            self.update_time_ticks(self.x_axis_max)
 
 
             #Auto-scale y-axis
@@ -816,14 +819,13 @@ class DataAcquisitionDashboard(QWidget):
                 min_force = min(self.force_data)
                 max_force = max(self.force_data)
                 margin = (max_force - min_force) * 0.1 if max_force > min_force else 100
-                self.ax.set_ylim(max(0, min_force - margin), max_force + margin)
+                self.plot_widget.setYRange(max(0, min_force - margin), max_force + margin)
 
                 #Update peak value
                 self.peak_value_label.setText(f"{max_force:.1f} N")
 
             self.stats_data_points.setText(str(self.data_point_count))
             self.stats_duration.setText(f"{max_time:.1f} s")
-            self.canvas.draw()
     
     #Apply ordered list of filters to raw data, or revert if list is empty
     def apply_filter(self, filter_list):
@@ -841,3 +843,24 @@ class DataAcquisitionDashboard(QWidget):
         self.force_data.extend(filtered)
 
         self.update_plot()
+
+    #Update time ticks for x-axis to always displays 0 and 10 when timeout occurs
+    def update_time_ticks(self, max_time):
+        max_time = round(max_time, 1)
+        
+        if max_time <= 2:
+            step = 0.5
+        else:
+            step = 1.0
+        
+        ticks = []
+        time_value = step #skip 0 label
+        #Add ticks for each step
+        while time_value <= max_time:
+            ticks.append((time_value, f"{time_value:.1f}"))
+            time_value = round(time_value + step, 1)
+        #Add final tick if not already at max time
+        if ticks[-1][0] != max_time:
+            ticks.append((max_time, f"{max_time:.1f}"))
+        self.plot_widget.getAxis('bottom').setTicks([ticks])
+        self.plot_widget.setXRange(0, max_time + 0.15, padding=0) #Padding so max time visible (label)
