@@ -157,6 +157,7 @@ class LSMDApplication:
             #connect switch view signal
             self.data_acquisition_window.switch_view.connect(self.on_switch_view)
             self.data_acquisition_window.navigate_to_settings.connect(self.on_navigate_to_settings)
+            self.data_acquisition_window.clear_data_selected.connect(self.on_clear_data_filters)
         
         #Debug view
         else:
@@ -343,6 +344,10 @@ class LSMDApplication:
     #USB error
     def on_usb_error(self, error_message):
         print(f"USB error: {error_message}")
+
+    def on_clear_data_filters(self):
+        if self.settings_window:
+            self.settings_window.reset_filters()
     
 #Main app
 def main():

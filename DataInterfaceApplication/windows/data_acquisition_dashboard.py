@@ -24,7 +24,8 @@ class DataAcquisitionDashboard(QWidget):
     send_data = pyqtSignal(str)
     switch_view = pyqtSignal()
     disconnect_request = pyqtSignal()
-    navigate_to_settings = pyqtSignal() 
+    navigate_to_settings = pyqtSignal()
+    clear_data_selected = pyqtSignal()
 
     def __init__(self, connection_type, device_address=None, port_name=None, baud_rate=None):    #initialize address to None
         super().__init__()
@@ -680,6 +681,9 @@ class DataAcquisitionDashboard(QWidget):
             self.rate_end_input.clear()
             self.rate_value_label.setText("—")
             self.clear_rate_lines()
+
+            #Emit signal to clear filters
+            self.clear_data_selected.emit()
     
     #Export CSV clicked
     def on_export_csv_clicked(self):

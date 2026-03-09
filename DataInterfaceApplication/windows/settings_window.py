@@ -787,3 +787,7 @@ class SettingsWindow(QWidget):
         card_layout.addWidget(calibration_button)
 
         return card
+
+    #Clear filters
+    def reset_filters(self):
+        self.preset_dropdown.setCurrentIndex(0)
