@@ -49,6 +49,8 @@ class DataAcquisitionDashboard(QWidget):
         self.acquisition_timer = QTimer()
         self.acquisition_timer.setSingleShot(True)
         self.acquisition_timer.timeout.connect(self._on_acquisition_timeout)
+        self.rate_start_line = None
+        self.rate_end_line = None
         
         self.init_ui()
 
@@ -263,8 +265,8 @@ class DataAcquisitionDashboard(QWidget):
         card2 = self.create_peak_force_card()
         cards_layout.addWidget(card2, 1)
         
-        #Card 3: placeholder for now
-        card3 = self.create_empty_card()
+        #Card 3: Rate analysis card
+        card3 = self.create_rate_analysis_card()
         cards_layout.addWidget(card3, 1)
         
         layout.addLayout(cards_layout)
@@ -597,6 +599,14 @@ class DataAcquisitionDashboard(QWidget):
             #Reset peak value
             self.peak_value_label.setText("0.0 N")
 
+            #Disable and clear rate analysis
+            self.rate_start_input.setEnabled(False)
+            self.rate_start_input.clear()
+            self.rate_end_input.setEnabled(False)
+            self.rate_end_input.clear()
+            self.rate_value_label.setText("—")
+            self.clear_rate_lines()
+
             #Update recording status
             self.recording_status_label.setText("Recording")
             self.recording_status_label.setStyleSheet("""
@@ -641,6 +651,10 @@ class DataAcquisitionDashboard(QWidget):
             self.send_data.emit("stop")
             print("Acquisition stopped")
             print(f"Data points: {self.data_point_count}")
+
+            #Enable rate analysis inputs
+            self.rate_start_input.setEnabled(True)
+            self.rate_end_input.setEnabled(True)
     
     #Clear data clicked
     def on_clear_data_clicked(self):
@@ -658,6 +672,14 @@ class DataAcquisitionDashboard(QWidget):
             self.update_time_ticks(10)
             self.stats_data_points.setText("0")
             self.stats_duration.setText("0.0 s")
+
+            #Clear rate analysis
+            self.rate_start_input.setEnabled(False)
+            self.rate_start_input.clear()
+            self.rate_end_input.setEnabled(False)
+            self.rate_end_input.clear()
+            self.rate_value_label.setText("—")
+            self.clear_rate_lines()
     
     #Export CSV clicked
     def on_export_csv_clicked(self):
@@ -864,3 +886,194 @@ class DataAcquisitionDashboard(QWidget):
             ticks.append((max_time, f"{max_time:.1f}"))
         self.plot_widget.getAxis('bottom').setTicks([ticks])
         self.plot_widget.setXRange(0, max_time + 0.15, padding=0) #Padding so max time visible (label)
+
+    #Rate analysis card
+    def create_rate_analysis_card(self):
+        card = QFrame()
+        card.setStyleSheet("""
+        QFrame {
+            background-color: #FFFFFF;
+            border: 1px solid #E0E0E0;
+            border-radius: 8px;
+        }
+        """)
+
+        card.setMinimumHeight(165)
+
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(16, 12, 16, 16)
+        card_layout.setSpacing(8)
+
+        #Card header
+        header_layout = QHBoxLayout()
+        header_layout.setSpacing(12)
+
+        icon_label = QLabel("↗")
+        icon_label.setStyleSheet("color: #1A1A1A; font-size: 14px; background: transparent; border: none;")
+        title_label = QLabel("Force Rate Analysis")
+        title_label.setStyleSheet("color: #1A1A1A; font-size: 14px; font-weight: 600; background: transparent; border: none;")
+
+        header_layout.addWidget(icon_label)
+        header_layout.addWidget(title_label)
+        header_layout.addStretch(1)
+
+        card_layout.addLayout(header_layout)
+
+        #Start and End labels
+        labels_layout = QHBoxLayout()
+        labels_layout.setContentsMargins(0, 0, 0, 0)
+        labels_layout.setSpacing(12)
+
+        start_label = QLabel("Start (s)")
+        start_label.setStyleSheet("color: #1A1A1A; font-size: 12px; font-weight: 500; background: transparent; border: none;")
+        end_label = QLabel("End (s)")
+        end_label.setStyleSheet("color: #1A1A1A; font-size: 12px; font-weight: 500; background: transparent; border: none;")
+
+        labels_layout.addWidget(start_label, 1)
+        labels_layout.addWidget(end_label, 1)
+        card_layout.addLayout(labels_layout)
+
+        #Start and End inputs
+        inputs_layout = QHBoxLayout()
+        inputs_layout.setContentsMargins(0, 0, 0, 0)
+        inputs_layout.setSpacing(12)
+
+        self.rate_start_input = QLineEdit()
+        self.rate_start_input.setPlaceholderText("")
+        self.rate_start_input.setEnabled(False)
+        self.rate_start_input.setStyleSheet("""
+            QLineEdit {
+                background-color: #F5F5F5;
+                border: 1px solid #E0E0E0;
+                border-radius: 3px;
+                padding: 6px 10px;
+                font-size: 12px;
+                color: #1A1A1A;
+            }
+            QLineEdit:disabled {
+                background-color: #EBEBEB;
+                color: #999999;
+            }
+        """)
+        self.rate_start_input.textChanged.connect(self.on_rate_input_changed)
+
+        self.rate_end_input = QLineEdit()
+        self.rate_end_input.setPlaceholderText("")
+        self.rate_end_input.setEnabled(False)
+        self.rate_end_input.setStyleSheet("""
+            QLineEdit {
+                background-color: #F5F5F5;
+                border: 1px solid #E0E0E0;
+                border-radius: 3px;
+                padding: 6px 10px;
+                font-size: 12px;
+                color: #1A1A1A;
+            }
+            QLineEdit:disabled {
+                background-color: #EBEBEB;
+                color: #999999;
+            }
+        """)
+        self.rate_end_input.textChanged.connect(self.on_rate_input_changed)
+
+        inputs_layout.addWidget(self.rate_start_input, 1)
+        inputs_layout.addWidget(self.rate_end_input, 1)
+        card_layout.addLayout(inputs_layout)
+
+        #Rate result
+        rate_label = QLabel("Rate of Force Development")
+        rate_label.setStyleSheet("color: #666666; font-size: 12px; background: transparent; border: none;")
+        card_layout.addWidget(rate_label)
+
+        #Default display
+        self.rate_value_label = QLabel("—")
+        self.rate_value_label.setStyleSheet("color: #1A1A1A; font-size: 20px; font-weight: 600; background: transparent; border: none;")
+        card_layout.addWidget(self.rate_value_label)
+
+        card_layout.addStretch(1)
+
+        return card
+
+    #Rate input changed
+    def on_rate_input_changed(self):
+        start_text = self.rate_start_input.text().strip()
+        end_text = self.rate_end_input.text().strip()
+
+        #When no input, default display
+        if not start_text or not end_text:
+            self.clear_rate_lines()
+            self.rate_value_label.setText("—")
+            return
+        
+        #Round to 1 decimal place
+        try:
+            start_val = round(float(start_text), 1)
+            end_val = round(float(end_text), 1)
+        except ValueError:
+            self.clear_rate_lines()
+            self.rate_value_label.setText("—")
+            return
+
+        #Clamp start to 0 min
+        max_time = max(self.time_data) if len(self.time_data) > 0 else 0
+        if start_val < 0:
+            start_val = 0.0
+            self.rate_start_input.setText(f"{start_val:.1f}")
+
+        #Clamp end to max time recorded
+        if end_val > max_time:
+            end_val = round(max_time, 1)
+            self.rate_end_input.setText(f"{end_val:.1f}")
+
+        #Valid range, calculate and draw lines
+        self.calculate_rate(start_val, end_val)
+        self.draw_rate_lines(start_val, end_val)
+
+    #Calculate average rate of force development
+    def calculate_rate(self, start_time, end_time):
+        time_list = list(self.time_data)
+        force_list = list(self.force_data)
+
+        #Find closest indices for start and end
+        start_index = min(range(len(time_list)), key=lambda i: abs(time_list[i] - start_time))
+        end_index = min(range(len(time_list)), key=lambda i: abs(time_list[i] - end_time))
+
+        #cannot be same
+        if start_index == end_index:
+            self.rate_value_label.setText("—")
+            return
+
+        delta_force = force_list[end_index] - force_list[start_index]
+        delta_time = time_list[end_index] - time_list[start_index]
+
+        #cannot be zero
+        if delta_time == 0:
+            self.rate_value_label.setText("—")
+            return
+
+        rate = delta_force / delta_time
+        self.rate_value_label.setText(f"{rate:.2f} N/s")
+
+    #Draw rate lines on plot
+    def draw_rate_lines(self, start_time, end_time):
+        #Remove existing lines
+        self.clear_rate_lines()
+
+        pen = pg.mkPen(color='#DAA520', width=1.5, style=Qt.PenStyle.DashLine)
+
+        #Add vertical lines with labels
+        self.rate_start_line = self.plot_widget.addLine(x=start_time, pen=pen, label='Start',
+            labelOpts={'position': 0.85, 'color': '#DAA520', 'fill': '#FAFAFA'})
+        self.rate_end_line = self.plot_widget.addLine(x=end_time, pen=pen, label='End',
+            labelOpts={'position': 0.85, 'color': '#DAA520', 'fill': '#FAFAFA'})
+
+    #Clear lines
+    def clear_rate_lines(self):
+        if hasattr(self, 'rate_start_line') and self.rate_start_line:
+            self.plot_widget.removeItem(self.rate_start_line)
+            self.rate_start_line = None
+        if hasattr(self, 'rate_end_line') and self.rate_end_line:
+            self.plot_widget.removeItem(self.rate_end_line)
+            self.rate_end_line = None
+
+
