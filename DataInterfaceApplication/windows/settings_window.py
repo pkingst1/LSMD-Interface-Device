@@ -331,7 +331,7 @@ class SettingsWindow(QWidget):
 
         card1_layout.addStretch(1)
 
-        #Card 3: Empty for now (middle left)
+        #Card 3: Measurement settings card (middle left)
         card3 = self.create_measurement_settings_card()
 
         #Card 5: Empty for now (bottom left)
@@ -345,16 +345,8 @@ class SettingsWindow(QWidget):
         """)
         card5.setMinimumHeight(155)
 
-        #Card2: empty for now (top right)
-        card2 = QFrame()
-        card2.setStyleSheet("""
-            QFrame {
-                background-color: #FFFFFF;
-                border: 1px solid #1A1A1A;
-                border-radius: 8px;
-            }
-        """)
-        card2.setMinimumHeight(250)
+        #Card2: Calibration card (top right)
+        card2 = self.create_calibration_card()
 
         #Card4: empty for now (middle right)
         card4 = QFrame()
@@ -367,7 +359,7 @@ class SettingsWindow(QWidget):
         """)
         card4.setMinimumHeight(260)
 
-        #Card6: empty for now (middle right)
+        #Card6: empty for now (bottom right)
         card6 = QFrame()
         card6.setStyleSheet("""
             QFrame {
@@ -696,3 +688,102 @@ class SettingsWindow(QWidget):
                 raise ValueError
         except ValueError:
             self.limb_length_input.setText("50")
+
+    #Calibration card
+    def create_calibration_card(self):
+        card = QFrame()
+        card.setStyleSheet("""
+        QFrame {
+            background-color: #FFFFFF;
+            border: 1px solid #E0E0E0;
+            border-radius: 8px;
+        }
+        """)
+        card.setMinimumHeight(250)
+
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(16, 12, 16, 16)
+        card_layout.setSpacing(4)
+
+        #Card header
+        header_layout = QHBoxLayout()
+        icon_label = QLabel("⊕")
+        icon_label.setStyleSheet("color: #1A1A1A; font-size: 14px; background: transparent; border: none;")
+        title_label = QLabel("Device Calibration")
+        title_label.setStyleSheet("color: #1A1A1A; font-size: 14px; font-weight: 600; background: transparent; border: none;")
+        header_layout.addWidget(icon_label)
+        header_layout.addWidget(title_label)
+        header_layout.addStretch(1)
+        card_layout.addLayout(header_layout)
+
+        #Subtitle
+        subtitle_label = QLabel("Calibrate and maintain measurement accuracy")
+        subtitle_label.setStyleSheet("color: #666666; font-size: 12px; background: transparent; border: none;")
+        card_layout.addWidget(subtitle_label)
+
+        card_layout.addSpacing(6)
+
+        #Zero calibration status
+        zero_container = QVBoxLayout()
+        zero_container.setSpacing(1)
+        zero_label = QLabel("Zero Calibration Status")
+        zero_label.setStyleSheet("color: #1A1A1A; font-size: 12px; font-weight: 500; background: transparent; border: none;")
+        zero_container.addWidget(zero_label)
+
+        zero_status_layout = QHBoxLayout()
+        zero_status_layout.setContentsMargins(0, 0, 0, 0)
+        zero_status_layout.setSpacing(4)
+        zero_dot = QLabel("●")
+        zero_dot.setStyleSheet("color: #DAA520; font-size: 10px; background: transparent; border: none;")
+        zero_text = QLabel("Every session placeholder")
+        zero_text.setStyleSheet("color: #666666; font-size: 11px; background: transparent; border: none;")
+        zero_status_layout.addWidget(zero_dot)
+        zero_status_layout.addWidget(zero_text)
+        zero_status_layout.addStretch(1)
+        zero_container.addLayout(zero_status_layout)
+        card_layout.addLayout(zero_container)
+
+        #5-point calibration status
+        five_container = QVBoxLayout()
+        five_container.setSpacing(1)
+        five_label = QLabel("5-Point Calibration")
+        five_label.setStyleSheet("color: #1A1A1A; font-size: 12px; font-weight: 500; background: transparent; border: none;")
+        five_container.addWidget(five_label)
+
+        five_status_layout = QHBoxLayout()
+        five_status_layout.setContentsMargins(0, 0, 0, 0)
+        five_status_layout.setSpacing(4)
+        five_dot = QLabel("●")
+        five_dot.setStyleSheet("color: #4CAF50; font-size: 10px; background: transparent; border: none;")
+        five_text = QLabel("Day - Month - Year last calibration")
+        five_text.setStyleSheet("color: #666666; font-size: 11px; background: transparent; border: none;")
+        five_status_layout.addWidget(five_dot)
+        five_status_layout.addWidget(five_text)
+        five_status_layout.addStretch(1)
+        five_container.addLayout(five_status_layout)
+        card_layout.addLayout(five_container)
+
+        #Recommended frequency
+        frequency_label = QLabel("Recommended Frequency: Every 6 months")
+        frequency_label.setStyleSheet("color: #666666; font-size: 11px; background: transparent; border: none;")
+        card_layout.addWidget(frequency_label)
+
+        card_layout.addStretch(1)
+
+        #Open calibration panel button
+        calibration_button = QPushButton("Open Calibration Panel")
+        calibration_button.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #666666;
+                border: 1px solid #E0E0E0;
+                border-radius: 2px;
+                padding: 7px 12px;
+                font-size: 12px;
+                margin: 0px;
+            }
+        """)
+        #TODO: Add functionality to open calibration panel
+        card_layout.addWidget(calibration_button)
+
+        return card
