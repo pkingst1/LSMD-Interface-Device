@@ -349,15 +349,7 @@ class SettingsWindow(QWidget):
         card2 = self.create_calibration_card()
 
         #Card4: empty for now (middle right)
-        card4 = QFrame()
-        card4.setStyleSheet("""
-            QFrame {
-                background-color: #FFFFFF;
-                border: 1px solid #1A1A1A;
-                border-radius: 8px;
-            }
-        """)
-        card4.setMinimumHeight(260)
+        card4 = self.create_device_settings_card()
 
         #Card6: empty for now (bottom right)
         card6 = QFrame()
@@ -791,3 +783,89 @@ class SettingsWindow(QWidget):
     #Clear filters
     def reset_filters(self):
         self.preset_dropdown.setCurrentIndex(0)
+
+    #Device settings card
+    def create_device_settings_card(self):
+        card = QFrame()
+        card.setStyleSheet("""
+        QFrame {
+            background-color: #FFFFFF;
+            border: 1px solid #E0E0E0;
+            border-radius: 8px;
+        }
+        """)
+        card.setMinimumHeight(260)
+
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(16, 12, 16, 16)
+        card_layout.setSpacing(6)
+
+        #Card header
+        header_layout = QHBoxLayout()
+        icon_label = QLabel("⚙")
+        icon_label.setStyleSheet("color: #1A1A1A; font-size: 14px; background: transparent; border: none;")
+        title_label = QLabel("Device Settings")
+        title_label.setStyleSheet("color: #1A1A1A; font-size: 14px; font-weight: 600; background: transparent; border: none;")
+        header_layout.addWidget(icon_label)
+        header_layout.addWidget(title_label)
+        header_layout.addStretch(1)
+        card_layout.addLayout(header_layout)
+
+        #Subtitle
+        subtitle_label = QLabel("Configure device-specific parameters")
+        subtitle_label.setStyleSheet("color: #666666; font-size: 12px; background: transparent; border: none;")
+        card_layout.addWidget(subtitle_label)
+
+        #Sampling rate (fixed input)
+        rate_label = QLabel("Sampling Rate")
+        rate_label.setStyleSheet("color: #1A1A1A; font-size: 12px; font-weight: 500; background: transparent; border: none;")
+        card_layout.addWidget(rate_label)
+
+        rate_input = QLineEdit("1200 Hz (Fixed)")
+        rate_input.setEnabled(False)
+        rate_input.setStyleSheet("""
+            QLineEdit {
+                background-color: #F5F5F5;
+                border: 1px solid #E0E0E0;
+                border-radius: 3px;
+                padding: 6px 10px;
+                font-size: 12px;
+                color: #1A1A1A;
+            }
+            QLineEdit:disabled {
+                background-color: #EBEBEB;
+                color: #999999;
+            }
+        """)
+        card_layout.addWidget(rate_input)
+
+        rate_description = QLabel("High-frequency sampling for accurate force measurements")
+        rate_description.setStyleSheet("color: #666666; font-size: 11px; background: transparent; border: none;")
+        card_layout.addWidget(rate_description)
+
+        #Connection timeout
+        timeout_label = QLabel("Connection Timeout (seconds)")
+        timeout_label.setStyleSheet("color: #1A1A1A; font-size: 12px; font-weight: 500; background: transparent; border: none;")
+        card_layout.addWidget(timeout_label)
+
+        timeout_input = QLineEdit("30")
+        timeout_input.setEnabled(False)
+        timeout_input.setStyleSheet("""
+            QLineEdit {
+                background-color: #F5F5F5;
+                border: 1px solid #E0E0E0;
+                border-radius: 3px;
+                padding: 6px 10px;
+                font-size: 12px;
+                color: #1A1A1A;
+            }
+            QLineEdit:disabled {
+                background-color: #EBEBEB;
+                color: #999999;
+            }
+        """)
+        card_layout.addWidget(timeout_input)
+
+        card_layout.addStretch(1)
+        
+        return card
