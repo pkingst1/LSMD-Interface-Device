@@ -806,6 +806,10 @@ class DataAcquisitionDashboard(QWidget):
             try:
                 force_value = float(line)
 
+                #Reject values outside of expected 10 bit range (0-1023)
+                if force_value < 0 or force_value > 1023:
+                    continue
+
                 #Calculate time from sample count
                 time_value = self.data_point_count / self.sample_rate
 
@@ -852,6 +856,10 @@ class DataAcquisitionDashboard(QWidget):
 
             self.stats_data_points.setText(str(self.data_point_count))
             self.stats_duration.setText(f"{max_time:.1f} s")
+
+            #Send heartbeat to confirm updating
+            #if self.is_acquiring:
+            #    self.send_data.emit("stop")
     
     #Apply ordered list of filters to raw data, or revert if list is empty
     def apply_filter(self, filter_list):
@@ -1035,6 +1043,12 @@ class DataAcquisitionDashboard(QWidget):
 
     #Calculate average rate of force development
     def calculate_rate(self, start_time, end_time):
+
+        #Reject if end is before start
+        if end_time <= start_time:
+            self.rate_value_label.setText("—")
+            return
+
         time_list = list(self.time_data)
         force_list = list(self.force_data)
 

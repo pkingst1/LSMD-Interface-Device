@@ -122,7 +122,7 @@ class BluetoothManager(QObject):
 
             #ESP32 peripheral
             #Uncomment line below and comment line above to use ESP32 peripheral
-            # TARGET_SERVICE_UUID = "4fa4a4aa-0001-4000-8000-000000000000"
+            #TARGET_SERVICE_UUID = "4fa4a4aa-0001-4000-8000-000000000000"
 
             #Loop through services and characteristics
             for service in services:
