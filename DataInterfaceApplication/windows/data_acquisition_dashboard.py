@@ -858,8 +858,8 @@ class DataAcquisitionDashboard(QWidget):
             self.stats_duration.setText(f"{max_time:.1f} s")
 
             #Send heartbeat to confirm updating
-            if self.is_acquiring:
-                self.send_data.emit("hb")
+            #if self.is_acquiring:
+            #    self.send_data.emit("stop")
     
     #Apply ordered list of filters to raw data, or revert if list is empty
     def apply_filter(self, filter_list):
