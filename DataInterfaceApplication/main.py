@@ -11,9 +11,11 @@ from windows.connection_window import ConnectionWindow
 from windows.device_selection import DeviceSelection
 from windows.data_acquisition import DataAcquisitionWindow
 from windows.data_acquisition_dashboard import DataAcquisitionDashboard
+from windows.calibration_window import CalibrationWindow
 from windows.settings_window import SettingsWindow
 from utils.bluetooth_manager import BluetoothWorker
 from utils.usb_manager import USBWorker
+from utils.zero_calibration import ZeroCalibration
 
 #Main Application Controller
 class LSMDApplication:
@@ -26,6 +28,7 @@ class LSMDApplication:
         self.device_selection_window = None
         self.data_acquisition_window = None
         self.settings_window = None
+        self.calibration_window = None
 
         #Track view type
         self.using_dashboard = True
@@ -38,6 +41,9 @@ class LSMDApplication:
         self.usb_worker = None
         self.connected_port = None
         self.connected_baud_rate = None
+
+        #Zero calibration for force measurements
+        self.zero_calibration = ZeroCalibration()
 
         #Track connection type
         self.connection_type = None
@@ -197,6 +203,8 @@ class LSMDApplication:
             self.settings_window.navigate_to_dashboard.connect(self.on_navigate_to_dashboard)
             self.settings_window.disconnect_request.connect(self.on_disconnect_request)
             self.settings_window.filter_settings_changed.connect(self.on_filter_settings_changed)
+            self.settings_window.navigate_to_calibration.connect(self.on_navigate_to_calibration)
+
 
         self.settings_window.setGeometry(self._saved_geometry) #Restore size
         self.settings_window.show()
@@ -236,9 +244,56 @@ class LSMDApplication:
         #Show dashboard view
         self.show_data_acquisition_window()
 
+    #Navigate to calibraton panel (overlay settings)
+    def on_navigate_to_calibration(self):
+        if self.settings_window:
+            self._saved_geometry = self.settings_window.geometry()
+            self.settings_window.hide()
+
+        if self.calibration_window is None:
+            self.calibration_window = CalibrationWindow(
+                connection_type=self.connection_type,
+                device_address=self.connected_device_address,
+                port_name=self.connected_port,
+                baud_rate=self.connected_baud_rate
+            )
+            self.calibration_window.navigate_to_settings.connect(self.on_navigate_to_settings_from_calibration)
+            self.calibration_window.navigate_to_dashboard.connect(self.on_navigate_to_dashboard_from_calibration)
+            self.calibration_window.disconnect_request.connect(self.on_disconnect_request)
+            self.calibration_window.send_data.connect(self.on_send_data)
+            self.calibration_window.zero_calibration_complete.connect(self.on_zero_calibration_complete)
+
+        self.calibration_window.setGeometry(self._saved_geometry)
+        self.calibration_window.show()
+
+    #Navigate back to settings from calibration
+    def on_navigate_to_settings_from_calibration(self):
+        if self.calibration_window:
+            self._saved_geometry = self.calibration_window.geometry()
+            self.calibration_window.hide()
+
+        if self.settings_window:
+            self.settings_window.setGeometry(self._saved_geometry)
+            self.settings_window.show()
+
+    #Navigate to dashboard from calibration (skips settings)
+    def on_navigate_to_dashboard_from_calibration(self):
+        if self.calibration_window:
+            self._saved_geometry = self.calibration_window.geometry()
+            self.calibration_window.hide()
+
+        if self.data_acquisition_window:
+            self.data_acquisition_window.setGeometry(self._saved_geometry)
+            self.data_acquisition_window.show()
+
     #Data received
     def on_data_received(self, data):
-        #check for acquisition window, display data
+        #Route to calibration window if zero calibration is collecting
+        if self.calibration_window and self.calibration_window.is_zero_collecting:
+            self.calibration_window.append_zero_calibration_data(data)
+            return
+
+        #Normal data flow to acquisition window
         if self.data_acquisition_window:
             self.data_acquisition_window.append_data(data)
     
@@ -273,6 +328,11 @@ class LSMDApplication:
         if self.settings_window:
             self.settings_window.close()
             self.settings_window = None
+
+        #close calibration window
+        if self.calibration_window:
+            self.calibration_window.close()
+            self.calibration_window = None
         
         #Reset connection type
         self.connection_type = None
@@ -348,6 +408,16 @@ class LSMDApplication:
     def on_clear_data_filters(self):
         if self.settings_window:
             self.settings_window.reset_filters()
+
+    #Zero calibration complete - store offset and forward to dashboard
+    def on_zero_calibration_complete(self, offset):
+        self.zero_calibration.zero_offset = offset
+        self.zero_calibration.is_calibrated = True
+        print(f"Zero calibration stored — offset: {offset:.2f}")
+
+        #Apply to dashboard if it exists
+        if self.data_acquisition_window:
+            self.data_acquisition_window.zero_offset = offset
     
 #Main app
 def main():
