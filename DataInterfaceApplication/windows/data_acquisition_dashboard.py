@@ -52,6 +52,8 @@ class DataAcquisitionDashboard(QWidget):
         self.acquisition_timer.timeout.connect(self._on_acquisition_timeout)
         self.rate_start_line = None
         self.rate_end_line = None
+
+        self.zero_offset = 0.0
         
         self.init_ui()
 
@@ -813,9 +815,12 @@ class DataAcquisitionDashboard(QWidget):
                 #Calculate time from sample count
                 time_value = self.data_point_count / self.sample_rate
 
+                #Apply zero calibration offset
+                corrected_value = force_value - self.zero_offset
+
                 self.time_data.append(time_value)
-                self.force_data.append(force_value)
-                self.raw_force_data.append(force_value)
+                self.force_data.append(corrected_value)
+                self.raw_force_data.append(corrected_value)
                 self.data_point_count += 1
 
                 #Update plot every 60 points (~50ms at 1200 Hz)

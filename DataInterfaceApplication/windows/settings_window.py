@@ -4,7 +4,7 @@ Preserves connection state between data acquisition window
 """
 from PyQt6.QtWidgets import (QWidget, QLabel, QPushButton, QVBoxLayout,
                              QHBoxLayout, QFrame, QComboBox, QCheckBox,
-                             QScrollArea, QLineEdit)
+                             QScrollArea, QLineEdit, QProgressBar)
 from PyQt6.QtCore import Qt, pyqtSignal, QPropertyAnimation, QRect
 from PyQt6.QtGui import QColor, QPainter, QPen, QBrush
 from utils.toggle_switch import ToggleSwitch
@@ -18,6 +18,7 @@ class SettingsWindow(QWidget):
     navigate_to_dashboard = pyqtSignal()
     disconnect_request = pyqtSignal()
     filter_settings_changed = pyqtSignal()
+    navigate_to_calibration = pyqtSignal()
     
 
     def __init__(self, connection_type, device_address=None, port_name=None, baud_rate=None):
@@ -775,7 +776,8 @@ class SettingsWindow(QWidget):
                 margin: 0px;
             }
         """)
-        #TODO: Add functionality to open calibration panel
+        #On calibraton button click, navigate to calibration window
+        calibration_button.clicked.connect(self.on_calibration_clicked)
         card_layout.addWidget(calibration_button)
 
         return card
@@ -869,3 +871,7 @@ class SettingsWindow(QWidget):
         card_layout.addStretch(1)
         
         return card
+
+    #On calibration button click, navigate to calibration window
+    def on_calibration_clicked(self):
+        self.navigate_to_calibration.emit()
