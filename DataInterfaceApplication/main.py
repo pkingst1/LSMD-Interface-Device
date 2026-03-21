@@ -262,6 +262,7 @@ class LSMDApplication:
             self.calibration_window.disconnect_request.connect(self.on_disconnect_request)
             self.calibration_window.send_data.connect(self.on_send_data)
             self.calibration_window.zero_calibration_complete.connect(self.on_zero_calibration_complete)
+            self.calibration_window.zero_status_updated.connect(self.on_zero_status_updated)
 
         self.calibration_window.setGeometry(self._saved_geometry)
         self.calibration_window.show()
@@ -418,6 +419,11 @@ class LSMDApplication:
         #Apply to dashboard if it exists
         if self.data_acquisition_window:
             self.data_acquisition_window.zero_offset = offset
+    
+    #Update zero calibration status on settings card
+    def on_zero_status_updated(self, offset, is_calibrated):
+        if self.settings_window:
+            self.settings_window.update_zero_status(offset, is_calibrated)
     
 #Main app
 def main():

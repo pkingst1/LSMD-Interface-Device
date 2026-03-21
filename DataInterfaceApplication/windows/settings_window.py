@@ -726,12 +726,12 @@ class SettingsWindow(QWidget):
         zero_status_layout = QHBoxLayout()
         zero_status_layout.setContentsMargins(0, 0, 0, 0)
         zero_status_layout.setSpacing(4)
-        zero_dot = QLabel("●")
-        zero_dot.setStyleSheet("color: #DAA520; font-size: 10px; background: transparent; border: none;")
-        zero_text = QLabel("Every session placeholder")
-        zero_text.setStyleSheet("color: #666666; font-size: 11px; background: transparent; border: none;")
-        zero_status_layout.addWidget(zero_dot)
-        zero_status_layout.addWidget(zero_text)
+        self.zero_dot = QLabel("●")
+        self.zero_dot.setStyleSheet("color: #DAA520; font-size: 10px; background: transparent; border: none;")
+        self.zero_text = QLabel("Every session placeholder")
+        self.zero_text.setStyleSheet("color: #666666; font-size: 11px; background: transparent; border: none;")
+        zero_status_layout.addWidget(self.zero_dot)
+        zero_status_layout.addWidget(self.zero_text)
         zero_status_layout.addStretch(1)
         zero_container.addLayout(zero_status_layout)
         card_layout.addLayout(zero_container)
@@ -875,3 +875,12 @@ class SettingsWindow(QWidget):
     #On calibration button click, navigate to calibration window
     def on_calibration_clicked(self):
         self.navigate_to_calibration.emit()
+
+    #Update zero calibration status display
+    def update_zero_status(self, offset, is_calibrated):
+        if is_calibrated:
+            self.zero_dot.setStyleSheet("color: #4CAF50; font-size: 10px; background: transparent; border: none;")
+            self.zero_text.setText(f"Offset: {offset:.2f}")
+        else:
+            self.zero_dot.setStyleSheet("color: #DAA520; font-size: 10px; background: transparent; border: none;")
+            self.zero_text.setText("Every session placeholder")

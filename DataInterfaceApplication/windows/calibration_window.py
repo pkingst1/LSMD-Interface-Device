@@ -20,6 +20,7 @@ class CalibrationWindow(QWidget):
     disconnect_request = pyqtSignal()
     send_data = pyqtSignal(str)
     zero_calibration_complete = pyqtSignal(float)
+    zero_status_updated = pyqtSignal(float, bool)
  
     def __init__(self, connection_type="usb", device_address=None, port_name=None, baud_rate=None):
         super().__init__()
@@ -638,6 +639,10 @@ class CalibrationWindow(QWidget):
 
                 self.zero_cal_buffer.append(force_value)
 
+                #Print buffer progress every 100 samples for debugging
+                #if len(self.zero_cal_buffer) % 100 == 0:
+                #    print(f"Zero cal buffer: {len(self.zero_cal_buffer)} / {self.zero_cal.total_samples}")
+
                 #Check if we have enough samples
                 if len(self.zero_cal_buffer) >= self.zero_cal.total_samples:
                     self.finish_zero_calibration()
@@ -665,6 +670,7 @@ class CalibrationWindow(QWidget):
 
         #Emit the computed offset so main.py can apply to dashboard readings
         self.zero_calibration_complete.emit(offset)
+        self.zero_status_updated.emit(offset, True)
 
         #Update UI to ready state
         self.progress_bar.setValue(100)
