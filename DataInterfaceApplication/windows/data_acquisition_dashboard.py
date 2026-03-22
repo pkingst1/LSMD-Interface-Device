@@ -202,17 +202,23 @@ class DataAcquisitionDashboard(QWidget):
         row2.addWidget(navigation_widget)
         row2.addStretch(1)
         
+        """
+        ---------------
+        Uncomment this section to add back the switch view button
+        ---------------
+        
         #Switch view button
         self.switch_view_button = QPushButton("Switch to Debug View")
         self.switch_view_button.setMinimumHeight(32)
         self.switch_view_button.setStyleSheet("""
-            QPushButton {
-                font-size: 11px;
-                font-weight: 500;
-            }
+            #QPushButton {
+               # font-size: 11px;
+               # font-weight: 500;
+           # }
         """)
         self.switch_view_button.clicked.connect(self.on_switch_view_clicked)
         row2.addWidget(self.switch_view_button)
+        """
         row2.addStretch(1)
 
         #Disconnect button
