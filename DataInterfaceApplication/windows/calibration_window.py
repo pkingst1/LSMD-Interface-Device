@@ -35,6 +35,10 @@ class CalibrationWindow(QWidget):
         self.zero_cal = ZeroCalibration()
         self.zero_cal_buffer = []
         self.is_zero_collecting = False
+
+        #Five point calibration data collection
+        self.five_point_active = False
+        self.five_point_step = 0
  
         #Initialize the UI
         self.init_ui()
@@ -52,9 +56,17 @@ class CalibrationWindow(QWidget):
         #Build top bar rows (battery, connection status, nav ticker, disconnect)
         self.create_top_bar(main_layout)
  
-        #Content area below top bar — same margins as settings scroll content
-        content_widget = QWidget()
-        content_layout = QVBoxLayout(content_widget)
+        #Scroll area
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll_area.setStyleSheet("background: transparent;")
+
+        scroll_content = QWidget()
+        scroll_content.setStyleSheet("background: transparent;")
+
+        content_layout = QVBoxLayout(scroll_content)
         content_layout.setContentsMargins(20, 20, 20, 20)
         content_layout.setSpacing(20)
  
@@ -66,11 +78,15 @@ class CalibrationWindow(QWidget):
  
         #Two side-by-side calibration procedure cards
         self.create_calibration_cards(content_layout)
+
+        #Five-point calibration bottom panel (hidden until process started)
+        self.create_five_point_panel(content_layout)
  
         #Push remaining space to bottom so cards stay at top
         content_layout.addStretch(1)
  
-        main_layout.addWidget(content_widget)
+        scroll_area.setWidget(scroll_content)
+        main_layout.addWidget(scroll_area)
  
     #Top bar, battery, navigation, connection, disconnect
     def create_top_bar(self, layout):
@@ -483,10 +499,10 @@ class CalibrationWindow(QWidget):
         info_row.addStretch(1)
         card_layout.addLayout(info_row)
  
-        #Start 5-Point Calibration button — outlined style, no functionality
-        start_button = QPushButton("▷  Start 5-Point Calibration")
-        start_button.setFixedHeight(36)
-        start_button.setStyleSheet("""
+        #Start 5-Point Calibration button
+        self.five_start_button = QPushButton("▷  Start 5-Point Calibration")
+        self.five_start_button.setFixedHeight(36)
+        self.five_start_button.setStyleSheet("""
             QPushButton {
                 background-color: transparent;
                 color: #666666;
@@ -497,7 +513,8 @@ class CalibrationWindow(QWidget):
                 font-weight: 500;
             }
         """)
-        card_layout.addWidget(start_button)
+        self.five_start_button.clicked.connect(self.on_five_point_calibration_clicked)
+        card_layout.addWidget(self.five_start_button)
  
         return card
  
@@ -571,6 +588,29 @@ class CalibrationWindow(QWidget):
             self.is_zero_collecting = False
             self.send_data.emit("stop")
             self.zero_cal_buffer = []
+
+        #Stop 5 point if in progress
+        if self.five_point_active:
+            self.five_point_active = False
+            self.five_point_panel.setVisible(False)
+
+            #Restore 5-point button
+            self.five_start_button.setEnabled(True)
+            self.five_start_button.setText("▷  Start 5-Point Calibration")
+            self.five_start_button.setStyleSheet("""
+                QPushButton {
+                    background-color: transparent;
+                    color: #666666;
+                    border: 1px solid #E0E0E0;
+                    border-radius: 6px;
+                    padding: 8px 16px;
+                    font-size: 12px;
+                    font-weight: 500;
+                }
+            """)
+
+        #Restore zero button
+        self.zero_start_button.setEnabled(True)
 
         #Reset UI to initial state
         self.progress_bar.setValue(0)
@@ -705,3 +745,275 @@ class CalibrationWindow(QWidget):
                 font-weight: 500;
             }
         """)
+
+    #Create the five point calibration panel
+    def create_five_point_panel(self, layout):
+        self.five_point_panel = QFrame()
+        self.five_point_panel.setStyleSheet("""
+            QFrame {
+                background-color: #FFFFFF;
+                border: 1px solid #E0E0E0;
+                border-radius: 8px;
+            }
+        """)
+        self.five_point_panel.setVisible(False)
+
+        panel_layout = QVBoxLayout(self.five_point_panel)
+        panel_layout.setContentsMargins(16, 12, 16, 16)
+        panel_layout.setSpacing(8)
+
+        #Panel header
+        header_label = QLabel("Calibration Points")
+        header_label.setStyleSheet("color: #1A1A1A; font-size: 14px; font-weight: 600; background: transparent; border: none;")
+        panel_layout.addWidget(header_label)
+
+        subtitle_label = QLabel("Progress through each calibration point")
+        subtitle_label.setStyleSheet("color: #888888; font-size: 12px; background: transparent; border: none;")
+        panel_layout.addWidget(subtitle_label)
+
+        #Calibration point boxes row
+        points_row = QHBoxLayout()
+        points_row.setSpacing(8)
+
+        self.point_frames = []
+        self.point_labels = []
+        self.point_input_fields = []
+
+        for i in range(5):
+            point_frame = QFrame()
+            point_frame.setStyleSheet("""
+                QFrame {
+                    background-color: #F5F5F5;
+                    border: 1px solid #E0E0E0;
+                    border-radius: 6px;
+                }
+            """)
+
+            point_layout = QVBoxLayout(point_frame)
+            point_layout.setContentsMargins(8, 8, 8, 8)
+            point_layout.setSpacing(4)
+
+            point_label = QLabel(f"Point {i + 1}")
+            point_label.setStyleSheet("color: #1A1A1A; font-size: 12px; font-weight: 600; background: transparent; border: none;")
+            point_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            point_layout.addWidget(point_label)
+
+            ref_input = QLineEdit()
+            ref_input.setPlaceholderText("N")
+            ref_input.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            ref_input.setEnabled(False)
+            ref_input.setStyleSheet("""
+                QLineEdit {
+                    background-color: #FFFFFF;
+                    border: 1px solid #E0E0E0;
+                    border-radius: 3px;
+                    padding: 4px 6px;
+                    font-size: 11px;
+                    color: #1A1A1A;
+                }
+                QLineEdit:disabled {
+                    background-color: #EBEBEB;
+                    color: #999999;
+                }
+            """)
+            point_layout.addWidget(ref_input)
+
+            self.point_frames.append(point_frame)
+            self.point_labels.append(point_label)
+            self.point_input_fields.append(ref_input)
+            points_row.addWidget(point_frame)
+
+        panel_layout.addLayout(points_row)
+
+        #Capture Reading button
+        self.capture_button = QPushButton("◎  Capture Reading")
+        self.capture_button.setFixedHeight(36)
+        self.capture_button.setFixedWidth(200)
+        self.capture_button.setStyleSheet("""
+            QPushButton {
+                background-color: #1A1A1A;
+                color: #FFFFFF;
+                border: none;
+                border-radius: 6px;
+                padding: 8px 16px;
+                font-size: 12px;
+                font-weight: 500;
+            }
+        """)
+        self.capture_button.clicked.connect(self.on_capture_reading_clicked)
+
+        button_row = QHBoxLayout()
+        button_row.addStretch(1)
+        button_row.addWidget(self.capture_button)
+        button_row.addStretch(1)
+        panel_layout.addLayout(button_row)
+
+        layout.addWidget(self.five_point_panel)
+
+    #On five point calibration button clicked
+    def on_five_point_calibration_clicked(self):
+        self.five_point_active = True
+        self.five_point_step = 0
+
+        #Show the calibration points panel
+        self.five_point_panel.setVisible(True)
+
+        #Clear and disable all input fields
+        for ref_input in self.point_input_fields:
+            ref_input.clear()
+            ref_input.setEnabled(False)
+
+        #Enable only the first point's input
+        self.point_input_fields[0].setEnabled(True)
+        self.point_input_fields[0].setFocus()
+
+        #Highlight the first point as active
+        self.update_five_point_highlight()
+
+        #Disable other buttons
+        self.zero_start_button.setEnabled(False)
+        self.five_start_button.setEnabled(False)
+        self.five_start_button.setText("▷  In Progress...")
+        self.five_start_button.setStyleSheet("""
+            QPushButton {
+                background-color: #888888;
+                color: #FFFFFF;
+                border: none;
+                border-radius: 6px;
+                padding: 8px 16px;
+                font-size: 12px;
+                font-weight: 500;
+            }
+        """)
+
+        #Update status card
+        self.progress_bar.setValue(0)
+        self.ready_badge.setText("In Progress")
+        self.ready_badge.setStyleSheet("""
+            QLabel {
+                background-color: #F0F0F0;
+                color: #666666;
+                padding: 2px 10px;
+                border-radius: 4px;
+                font-size: 11px;
+                font-weight: 500;
+                border: 1px solid #E0E0E0;
+            }
+        """)
+        self.instruction_label.setText("Apply known weight for Point 1 and enter value in Newtons")
+
+        #Show cancel button
+        self.cancel_button.setVisible(True)
+
+    #Capture reading from 5 point, get input and update UI
+    def on_capture_reading_clicked(self):
+        if not self.five_point_active:
+            return
+
+        #Validate the reference input for current step
+        ref_text = self.point_input_fields[self.five_point_step].text().strip()
+        try:
+            ref_value = float(ref_text)
+        except ValueError:
+            self.instruction_label.setText("Please enter a valid reference value")
+            return
+
+        #Lock the current input field
+        self.point_input_fields[self.five_point_step].setEnabled(False)
+
+        #Mark current point as complete
+        self.point_frames[self.five_point_step].setStyleSheet("""
+            QFrame {
+                background-color: #E8F5E9;
+                border: 1px solid #4CAF50;
+                border-radius: 6px;
+            }
+        """)
+
+        #Advance to next step
+        self.five_point_step += 1
+
+        #Update progress bar
+        progress = int((self.five_point_step / 5) * 100)
+        self.progress_bar.setValue(progress)
+
+        #Check if all 5 points are captured
+        if self.five_point_step >= 5:
+            self.finish_five_point_calibration()
+            return
+
+        #Set up next step
+        self.instruction_label.setText(f"Apply known weight for Point {self.five_point_step + 1} and enter value in Newtons")
+        self.point_input_fields[self.five_point_step].setEnabled(True)
+        self.point_input_fields[self.five_point_step].setFocus()
+        self.update_five_point_highlight()
+
+    #After all 5 points, show completion
+    def finish_five_point_calibration(self):
+        self.five_point_active = False
+
+        #Update status card to complete
+        self.progress_bar.setValue(100)
+        self.ready_badge.setText("Complete")
+        self.ready_badge.setStyleSheet("""
+            QLabel {
+                background-color: #1A1A1A;
+                color: white;
+                padding: 2px 10px;
+                border-radius: 4px;
+                font-size: 11px;
+                font-weight: 500;
+                border: none;
+            }
+        """)
+        self.instruction_label.setText("5-Point calibration completed successfully")
+
+        #Hide cancel button
+        self.cancel_button.setVisible(False)
+
+        #Restore buttons
+        self.zero_start_button.setEnabled(True)
+        self.five_start_button.setEnabled(True)
+        self.five_start_button.setText("▷  Start 5-Point Calibration")
+        self.five_start_button.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #666666;
+                border: 1px solid #E0E0E0;
+                border-radius: 6px;
+                padding: 8px 16px;
+                font-size: 12px;
+                font-weight: 500;
+            }
+        """)
+
+    #Update visual on calibration box completion
+    def update_five_point_highlight(self):
+        for i, frame in enumerate(self.point_frames):
+            if i < self.five_point_step:
+                #Completed — green
+                frame.setStyleSheet("""
+                    QFrame {
+                        background-color: #E8F5E9;
+                        border: 1px solid #4CAF50;
+                        border-radius: 6px;
+                    }
+                """)
+            elif i == self.five_point_step:
+                #Active — dark border
+                frame.setStyleSheet("""
+                    QFrame {
+                        background-color: #F5F5F5;
+                        border: 2px solid #1A1A1A;
+                        border-radius: 6px;
+                    }
+                """)
+            else:
+                #Pending — default
+                frame.setStyleSheet("""
+                    QFrame {
+                        background-color: #F5F5F5;
+                        border: 1px solid #E0E0E0;
+                        border-radius: 6px;
+                    }
+                """)
