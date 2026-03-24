@@ -491,7 +491,7 @@ class CalibrationWindow(QWidget):
         info_icon = QLabel("ⓘ")
         info_icon.setStyleSheet("color: #888888; font-size: 12px; background: transparent; border: none;")
  
-        info_text = QLabel("Requires calibrated reference weights: 0, 20, 40, 60, 80, 100N")
+        info_text = QLabel("Requires calibrated reference weights: 0, 25, 50, 75, 100% Load (N)")
         info_text.setStyleSheet("color: #888888; font-size: 11px; background: transparent; border: none;")
  
         info_row.addWidget(info_icon)
@@ -793,13 +793,13 @@ class CalibrationWindow(QWidget):
             point_layout.setContentsMargins(8, 8, 8, 8)
             point_layout.setSpacing(4)
 
-            point_label = QLabel(f"Point {i + 1}")
+            point_label = QLabel(f"Point {i + 1}, {i*25}% Load (N)")
             point_label.setStyleSheet("color: #1A1A1A; font-size: 12px; font-weight: 600; background: transparent; border: none;")
             point_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             point_layout.addWidget(point_label)
 
             ref_input = QLineEdit()
-            ref_input.setPlaceholderText("N")
+            ref_input.setPlaceholderText("Enter value in (N)")
             ref_input.setAlignment(Qt.AlignmentFlag.AlignCenter)
             ref_input.setEnabled(False)
             ref_input.setStyleSheet("""
