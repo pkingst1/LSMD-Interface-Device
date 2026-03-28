@@ -4,7 +4,7 @@ Preserves connection state between data acquisition window
 """
 from PyQt6.QtWidgets import (QWidget, QLabel, QPushButton, QVBoxLayout,
                              QHBoxLayout, QFrame, QComboBox, QCheckBox,
-                             QScrollArea, QLineEdit, QProgressBar)
+                             QScrollArea, QLineEdit, QProgressBar, QGridLayout)
 from PyQt6.QtCore import Qt, pyqtSignal, QPropertyAnimation, QRect
 from PyQt6.QtGui import QColor, QPainter, QPen, QBrush
 from utils.toggle_switch import ToggleSwitch
@@ -19,6 +19,7 @@ class SettingsWindow(QWidget):
     disconnect_request = pyqtSignal()
     filter_settings_changed = pyqtSignal()
     navigate_to_calibration = pyqtSignal()
+    auto_reconnect_changed = pyqtSignal(bool)
     
 
     def __init__(self, connection_type, device_address=None, port_name=None, baud_rate=None):
@@ -226,116 +227,24 @@ class SettingsWindow(QWidget):
         header_layout.addWidget(subtitle)
         layout.addWidget(header_widget)
 
-    #Settings cards
+    #Settings cards — grid layout ensures row pairs share the same height
     def create_settings_cards(self, layout):
-        main_row = QHBoxLayout()
-        main_row.setSpacing(16)
+        grid = QGridLayout()
+        grid.setSpacing(16)
 
-        #Left column
-        left_column = QVBoxLayout()
-        left_column.setSpacing(16)
+        #Card 1: Filtering (top left)
+        card1 = self.create_filter_settings_card()
 
-        #Right column
-        right_column = QVBoxLayout()
-        right_column.setSpacing(16)
+        #Card 2: Calibration card (top right)
+        card2 = self.create_calibration_card()
 
-        #Card 1: Filtering (top right)
-        #TODO: set to separate function
-        card1 = QFrame()
-        card1.setStyleSheet("""
-            QFrame {
-                background-color: #FFFFFF;
-                border: 1px solid #E0E0E0;
-                border-radius: 8px;
-            }
-        """)
-        card1.setMinimumHeight(250)
-
-        card1_layout = QVBoxLayout(card1)
-        card1_layout.setContentsMargins(16, 12, 16, 16)
-        card1_layout.setSpacing(4)
-
-        #Card header
-        header_layout = QHBoxLayout()
-        icon_label = QLabel("▽")
-        icon_label.setStyleSheet("color: #1A1A1A; font-size: 14px; background: transparent; border: none;")
-        title_label = QLabel("Filtering")
-        title_label.setStyleSheet("color: #1A1A1A; font-size: 14px; font-weight: 600; background: transparent; border: none;")
-        header_layout.addWidget(icon_label)
-        header_layout.addWidget(title_label)
-        header_layout.addStretch(1)
-        card1_layout.addLayout(header_layout)
-
-        #Subtitle
-        subtitle_label = QLabel("Configure signal processing filters for data acquisition")
-        subtitle_label.setStyleSheet("color: #666666; font-size: 12px; background: transparent; border: none;")
-        card1_layout.addWidget(subtitle_label)
-
-        card1_layout.addSpacing(6)
-
-        #Filter preset dropdown
-        preset_label = QLabel("Filter Preset:")
-        preset_label.setStyleSheet("color: #1A1A1A; font-size: 12px; font-weight: 500; background: transparent; border: none;")
-        card1_layout.addWidget(preset_label)
-
-        preset_dropdown = QComboBox()
-        preset_dropdown.addItems(["None (Disabled)", "Enable All (Default)", "Custom"])
-        preset_dropdown.setStyleSheet("""
-            QComboBox {
-                color: #1A1A1A;
-                font-size: 12px;
-                padding: 6px 10px;
-                background-color: #F5F5F5;
-                border: 1px solid #E0E0E0;
-            }
-            QComboBox::drop-down {
-                border: none;
-                padding-right: 10px;
-            }
-            QComboBox QAbstractItemView {
-                font-size: 12px;
-                border: 1px solid #E0E0E0;
-                selection-background-color: #F5F5F5;
-                selection-color: #1A1A1A;
-            }
-        """)
-
-        card1_layout.addWidget(preset_dropdown)
-        self.preset_dropdown = preset_dropdown
-        preset_dropdown.currentIndexChanged.connect(self.on_filter_preset_changed)
-        card1_layout.addSpacing(6)
-
-        #Store checkbox references, create rows
-        self.notch_row = self.create_filter_rows("Notch Filter", "Attenuate specific frequency noise")
-        self.butterworth_row = self.create_filter_rows(
-            "Butterworth Filter", 
-            "Low-pass filter for signal smoothing",
-            is_expandable=True, 
-            param_label="Cutoff (Hz):")
-        self.moving_average_row = self.create_filter_rows("Moving Average Filter", "Smooth data using rolling average")
-
-        card1_layout.addWidget(self.notch_row)
-        card1_layout.addWidget(self.butterworth_row)
-        card1_layout.addWidget(self.moving_average_row)
-
-        #Update dropdown change settings
-        self.notch_row.checkbox.stateChanged.connect(self.update_filter_preset_dropdown)
-        self.butterworth_row.checkbox.stateChanged.connect(self.update_filter_preset_dropdown)
-        self.moving_average_row.checkbox.stateChanged.connect(self.update_filter_preset_dropdown)
-        self.butterworth_row.input_box.textChanged.connect(self.update_filter_preset_dropdown)
-
-        #Connect filter state changes
-        self.notch_row.checkbox.stateChanged.connect(self.on_filter_changed)
-        self.butterworth_row.checkbox.stateChanged.connect(self.on_filter_changed)
-        self.moving_average_row.checkbox.stateChanged.connect(self.on_filter_changed)
-        self.butterworth_row.input_box.textChanged.connect(self.on_filter_changed)
-
-        card1_layout.addStretch(1)
-
-        #Card 3: Measurement settings card (middle left)
+        #Card 3: Measurement settings card (bottom left)
         card3 = self.create_measurement_settings_card()
 
-        #Card 5: Empty for now (bottom left)
+        #Card 4: Device settings (bottom right)
+        card4 = self.create_device_settings_card()
+
+        #Card 5: Empty for now (row 3 left)
         card5 = QFrame()
         card5.setStyleSheet("""
             QFrame {
@@ -344,15 +253,8 @@ class SettingsWindow(QWidget):
                 border-radius: 8px;
             }
         """)
-        card5.setMinimumHeight(155)
 
-        #Card2: Calibration card (top right)
-        card2 = self.create_calibration_card()
-
-        #Card4: empty for now (middle right)
-        card4 = self.create_device_settings_card()
-
-        #Card6: empty for now (bottom right)
+        #Card 6: Empty for now (row 3 right)
         card6 = QFrame()
         card6.setStyleSheet("""
             QFrame {
@@ -361,20 +263,20 @@ class SettingsWindow(QWidget):
                 border-radius: 8px;
             }
         """)
-        card6.setMinimumHeight(155)
 
-        left_column.addWidget(card1)
-        left_column.addWidget(card3)
-        left_column.addWidget(card5)
+        #Grid: row, col — cards in the same row share height automatically
+        grid.addWidget(card1, 0, 0)  #Row 0, left
+        grid.addWidget(card2, 0, 1)  #Row 0, right
+        grid.addWidget(card3, 1, 0)  #Row 1, left
+        grid.addWidget(card4, 1, 1)  #Row 1, right
+        grid.addWidget(card5, 2, 0)  #Row 2, left
+        grid.addWidget(card6, 2, 1)  #Row 2, right
 
-        right_column.addWidget(card2)
-        right_column.addWidget(card4)
-        right_column.addWidget(card6)
+        #Equal column stretch so both columns share width evenly
+        grid.setColumnStretch(0, 1)
+        grid.setColumnStretch(1, 1)
 
-        main_row.addLayout(left_column, 1)
-        main_row.addLayout(right_column, 1)
-
-        layout.addLayout(main_row)
+        layout.addLayout(grid)
 
     def on_dashboard_clicked(self):
         self.navigate_to_dashboard.emit()
@@ -446,7 +348,7 @@ class SettingsWindow(QWidget):
                     background-color: #F5F5F5;
                     border: 1px solid #E0E0E0;
                     border-radius: 3px;
-                    padding: 3px 6px;
+                    padding: 6px 10px;
                     font-size: 11px;
                     color: #1A1A1A;
                 }
@@ -540,6 +442,101 @@ class SettingsWindow(QWidget):
 
         return filters
     
+    #Filter settings card
+    def create_filter_settings_card(self):
+        card = QFrame()
+        card.setStyleSheet("""
+            QFrame {
+                background-color: #FFFFFF;
+                border: 1px solid #E0E0E0;
+                border-radius: 8px;
+            }
+        """)
+        card.setMinimumHeight(250)
+
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(16, 12, 16, 16)
+        card_layout.setSpacing(4)
+
+        #Card header
+        header_layout = QHBoxLayout()
+        icon_label = QLabel("▽")
+        icon_label.setStyleSheet("color: #1A1A1A; font-size: 14px; background: transparent; border: none;")
+        title_label = QLabel("Filtering")
+        title_label.setStyleSheet("color: #1A1A1A; font-size: 14px; font-weight: 600; background: transparent; border: none;")
+        header_layout.addWidget(icon_label)
+        header_layout.addWidget(title_label)
+        header_layout.addStretch(1)
+        card_layout.addLayout(header_layout)
+
+        #Subtitle
+        subtitle_label = QLabel("Configure signal processing filters for data acquisition")
+        subtitle_label.setStyleSheet("color: #666666; font-size: 12px; background: transparent; border: none;")
+        card_layout.addWidget(subtitle_label)
+
+        card_layout.addSpacing(6)
+
+        #Filter preset dropdown
+        preset_label = QLabel("Filter Preset:")
+        preset_label.setStyleSheet("color: #1A1A1A; font-size: 12px; font-weight: 500; background: transparent; border: none;")
+        card_layout.addWidget(preset_label)
+
+        preset_dropdown = QComboBox()
+        preset_dropdown.addItems(["None (Disabled)", "Enable All (Default)", "Custom"])
+        preset_dropdown.setStyleSheet("""
+            QComboBox {
+                color: #1A1A1A;
+                font-size: 12px;
+                padding: 6px 10px;
+                background-color: #F5F5F5;
+                border: 1px solid #E0E0E0;
+            }
+            QComboBox::drop-down {
+                border: none;
+                padding-right: 10px;
+            }
+            QComboBox QAbstractItemView {
+                font-size: 12px;
+                border: 1px solid #E0E0E0;
+                selection-background-color: #F5F5F5;
+                selection-color: #1A1A1A;
+            }
+        """)
+
+        card_layout.addWidget(preset_dropdown)
+        self.preset_dropdown = preset_dropdown
+        preset_dropdown.currentIndexChanged.connect(self.on_filter_preset_changed)
+        card_layout.addSpacing(6)
+
+        #Store checkbox references, create rows
+        self.notch_row = self.create_filter_rows("Notch Filter", "Attenuate specific frequency noise")
+        self.butterworth_row = self.create_filter_rows(
+            "Butterworth Filter", 
+            "Low-pass filter for signal smoothing",
+            is_expandable=True, 
+            param_label="Cutoff (Hz):")
+        self.moving_average_row = self.create_filter_rows("Moving Average Filter", "Smooth data using rolling average")
+
+        card_layout.addWidget(self.notch_row)
+        card_layout.addWidget(self.butterworth_row)
+        card_layout.addWidget(self.moving_average_row)
+
+        #Update dropdown change settings
+        self.notch_row.checkbox.stateChanged.connect(self.update_filter_preset_dropdown)
+        self.butterworth_row.checkbox.stateChanged.connect(self.update_filter_preset_dropdown)
+        self.moving_average_row.checkbox.stateChanged.connect(self.update_filter_preset_dropdown)
+        self.butterworth_row.input_box.textChanged.connect(self.update_filter_preset_dropdown)
+
+        #Connect filter state changes
+        self.notch_row.checkbox.stateChanged.connect(self.on_filter_changed)
+        self.butterworth_row.checkbox.stateChanged.connect(self.on_filter_changed)
+        self.moving_average_row.checkbox.stateChanged.connect(self.on_filter_changed)
+        self.butterworth_row.input_box.textChanged.connect(self.on_filter_changed)
+
+        card_layout.addStretch(1)
+
+        return card
+
     #Create 3rd card: measurement settings
     def create_measurement_settings_card(self):
         card = QFrame()
@@ -550,7 +547,6 @@ class SettingsWindow(QWidget):
                 border-radius: 8px;
             }
         """)
-        card.setMinimumHeight(260)
 
         card_layout = QVBoxLayout(card)
         card_layout.setContentsMargins(16, 12, 16, 16)
@@ -726,12 +722,12 @@ class SettingsWindow(QWidget):
         zero_status_layout = QHBoxLayout()
         zero_status_layout.setContentsMargins(0, 0, 0, 0)
         zero_status_layout.setSpacing(4)
-        zero_dot = QLabel("●")
-        zero_dot.setStyleSheet("color: #DAA520; font-size: 10px; background: transparent; border: none;")
-        zero_text = QLabel("Every session placeholder")
-        zero_text.setStyleSheet("color: #666666; font-size: 11px; background: transparent; border: none;")
-        zero_status_layout.addWidget(zero_dot)
-        zero_status_layout.addWidget(zero_text)
+        self.zero_dot = QLabel("●")
+        self.zero_dot.setStyleSheet("color: #DAA520; font-size: 10px; background: transparent; border: none;")
+        self.zero_text = QLabel("Required every session")
+        self.zero_text.setStyleSheet("color: #666666; font-size: 11px; background: transparent; border: none;")
+        zero_status_layout.addWidget(self.zero_dot)
+        zero_status_layout.addWidget(self.zero_text)
         zero_status_layout.addStretch(1)
         zero_container.addLayout(zero_status_layout)
         card_layout.addLayout(zero_container)
@@ -796,7 +792,6 @@ class SettingsWindow(QWidget):
             border-radius: 8px;
         }
         """)
-        card.setMinimumHeight(260)
 
         card_layout = QVBoxLayout(card)
         card_layout.setContentsMargins(16, 12, 16, 16)
@@ -868,10 +863,118 @@ class SettingsWindow(QWidget):
         """)
         card_layout.addWidget(timeout_input)
 
+        #Auto turn off: toggle switch with mins inactivity input
+        auto_off_row = QWidget()
+        auto_off_row.setStyleSheet("background: transparent; border: none;")
+        auto_off_layout = QHBoxLayout(auto_off_row)
+        auto_off_layout.setContentsMargins(0, 4, 0, 0)
+        auto_off_layout.setSpacing(8)
+
+        auto_off_text_layout = QVBoxLayout()
+        auto_off_text_layout.setSpacing(1)
+        auto_off_name = QLabel("Auto Turn-Off")
+        auto_off_name.setStyleSheet("""
+            color: #1A1A1A; 
+            font-size: 12px; 
+            font-weight: 500; 
+            background: transparent; 
+            border: none;
+        """)
+        auto_off_sub = QLabel("Automatically turn off device after inactivity")
+        auto_off_sub.setStyleSheet("color: #888888; font-size: 11px; background: transparent; border: none;")
+        auto_off_text_layout.addWidget(auto_off_name)
+        auto_off_text_layout.addWidget(auto_off_sub)
+ 
+        self.auto_off_toggle = ToggleSwitch()
+        self.auto_off_toggle.setChecked(False)
+        auto_off_layout.addLayout(auto_off_text_layout)
+        auto_off_layout.addStretch(1)
+        auto_off_layout.addWidget(self.auto_off_toggle)
+        card_layout.addWidget(auto_off_row)
+
+        #Mins of inactivity input (visible when auto turn off enabled)
+        self.inactivity_label = QLabel("Minutes of inactivity")
+        self.inactivity_label.setStyleSheet("""
+            color: #1A1A1A; 
+            font-size: 12px; 
+            font-weight: 500; 
+            background: transparent; 
+            border: none;
+         """)
+        self.inactivity_label.setVisible(False)
+        card_layout.addWidget(self.inactivity_label)
+ 
+        self.inactivity_input = QLineEdit("30")
+        self.inactivity_input.setStyleSheet("""
+            QLineEdit {
+                background-color: #F5F5F5;
+                border: 1px solid #E0E0E0;
+                border-radius: 3px;
+                padding: 6px 10px;
+                font-size: 12px;
+                color: #1A1A1A;
+            }
+        """)
+        self.inactivity_input.setVisible(False)
+        card_layout.addWidget(self.inactivity_input)
+
+        #Toggle controls inactivity input visibility
+        self.auto_off_toggle.toggled.connect(self.on_auto_off_toggled)
+
+        #Auto reconnect toggle
+        auto_reconnect_row = QWidget()
+        auto_reconnect_row.setStyleSheet("background: transparent; border: none;")
+        auto_reconnect_layout = QHBoxLayout(auto_reconnect_row)
+        auto_reconnect_layout.setContentsMargins(0, 4, 0, 0)
+        auto_reconnect_layout.setSpacing(8)
+ 
+        auto_reconnect_text_layout = QVBoxLayout()
+        auto_reconnect_text_layout.setSpacing(1)
+        auto_reconnect_name = QLabel("Auto-reconnect")
+        auto_reconnect_name.setStyleSheet("""
+            color: #1A1A1A; 
+            font-size: 12px; 
+            font-weight: 500; 
+            background: transparent; 
+            border: none;
+            """)
+        auto_reconnect_sub = QLabel("Automatically reconnect if connection is lost")
+        auto_reconnect_sub.setStyleSheet("""
+            color: #888888; 
+            font-size: 11px; 
+            background: transparent; 
+            border: none;
+        """)
+        auto_reconnect_text_layout.addWidget(auto_reconnect_name)
+        auto_reconnect_text_layout.addWidget(auto_reconnect_sub)
+ 
+        self.auto_reconnect_toggle = ToggleSwitch()
+        self.auto_reconnect_toggle.setChecked(True)
+        self.auto_reconnect_toggle.toggled.connect(self.auto_reconnect_changed.emit)
+ 
+        auto_reconnect_layout.addLayout(auto_reconnect_text_layout)
+        auto_reconnect_layout.addStretch(1)
+        auto_reconnect_layout.addWidget(self.auto_reconnect_toggle)
+        card_layout.addWidget(auto_reconnect_row)
+
         card_layout.addStretch(1)
         
         return card
 
+    #Auto turn-off toggle handler — show/hide minutes of inactivity input
+    def on_auto_off_toggled(self, checked):
+        self.inactivity_label.setVisible(checked)
+        self.inactivity_input.setVisible(checked)
+
     #On calibration button click, navigate to calibration window
     def on_calibration_clicked(self):
         self.navigate_to_calibration.emit()
+
+    #Update zero calibration status display
+    def update_zero_status(self, offset, is_calibrated):
+        if is_calibrated:
+            self.zero_dot.setStyleSheet("color: #4CAF50; font-size: 10px; background: transparent; border: none;")
+            self.zero_text.setText(f"Offset: {offset:.2f}")
+        else:
+            self.zero_dot.setStyleSheet("color: #DAA520; font-size: 10px; background: transparent; border: none;")
+            self.zero_text.setText("Every session placeholder")

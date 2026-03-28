@@ -204,6 +204,7 @@ class LSMDApplication:
             self.settings_window.disconnect_request.connect(self.on_disconnect_request)
             self.settings_window.filter_settings_changed.connect(self.on_filter_settings_changed)
             self.settings_window.navigate_to_calibration.connect(self.on_navigate_to_calibration)
+            self.settings_window.auto_reconnect_changed.connect(self.on_auto_reconnect_changed)
 
 
         self.settings_window.setGeometry(self._saved_geometry) #Restore size
@@ -262,6 +263,7 @@ class LSMDApplication:
             self.calibration_window.disconnect_request.connect(self.on_disconnect_request)
             self.calibration_window.send_data.connect(self.on_send_data)
             self.calibration_window.zero_calibration_complete.connect(self.on_zero_calibration_complete)
+            self.calibration_window.zero_status_updated.connect(self.on_zero_status_updated)
 
         self.calibration_window.setGeometry(self._saved_geometry)
         self.calibration_window.show()
@@ -418,6 +420,18 @@ class LSMDApplication:
         #Apply to dashboard if it exists
         if self.data_acquisition_window:
             self.data_acquisition_window.zero_offset = offset
+    
+    #Update zero calibration status on settings card
+    def on_zero_status_updated(self, offset, is_calibrated):
+        if self.settings_window:
+            self.settings_window.update_zero_status(offset, is_calibrated)
+
+    #Auto reconnect changed
+    def on_auto_reconnect_changed(self, enabled):
+        if self.connection_type == "bluetooth" and self.bluetooth_worker:
+            self.bluetooth_worker.set_auto_reconnect_enable(enabled)
+        elif self.connection_type == "usb" and self.usb_worker:
+            self.usb_worker.set_auto_reconnect(enabled)
     
 #Main app
 def main():
