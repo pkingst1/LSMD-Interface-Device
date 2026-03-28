@@ -295,6 +295,11 @@ class LSMDApplication:
             self.calibration_window.append_zero_calibration_data(data)
             return
 
+        #Route to calibration window if five point calibration is collecting
+        if self.calibration_window and self.calibration_window.is_five_point_collecting:
+            self.calibration_window.append_five_point_calibration_data(data)
+            return
+
         #Normal data flow to acquisition window
         if self.data_acquisition_window:
             self.data_acquisition_window.append_data(data)
