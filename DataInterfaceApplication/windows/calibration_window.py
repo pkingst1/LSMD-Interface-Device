@@ -32,6 +32,7 @@ class CalibrationWindow(QWidget):
         self.device_address = device_address
         self.port_name = port_name
         self.baud_rate = baud_rate
+        self.sample_rate = sample_rate
         
         #Zero calibration data collection
         self.zero_cal = ZeroCalibration()
@@ -962,7 +963,7 @@ class CalibrationWindow(QWidget):
         self.send_data.emit("stop")
 
         #Always apply full filter chain to calibration
-        sample_rate = 1200
+        sample_rate = self.sample_rate
         calibration_filters = [
             NotchFilter(sample_rate=sample_rate),
             ButterworthFilter(cutoff=100.0, sample_rate=sample_rate),
@@ -1099,7 +1100,7 @@ class CalibrationWindow(QWidget):
         self.send_data.emit("stop")
 
         #Apply full filter chain
-        sample_rate = 1200
+        sample_rate = self.sample_rate
         calibration_filters = [
             NotchFilter(sample_rate=sample_rate),
             ButterworthFilter(cutoff=100.0, sample_rate=sample_rate),

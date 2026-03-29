@@ -256,7 +256,8 @@ class LSMDApplication:
                 connection_type=self.connection_type,
                 device_address=self.connected_device_address,
                 port_name=self.connected_port,
-                baud_rate=self.connected_baud_rate
+                baud_rate=self.connected_baud_rate,
+                sample_rate=self.data_acquisition_window.sample_rate
             )
             self.calibration_window.navigate_to_settings.connect(self.on_navigate_to_settings_from_calibration)
             self.calibration_window.navigate_to_dashboard.connect(self.on_navigate_to_dashboard_from_calibration)

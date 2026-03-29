@@ -5,7 +5,7 @@ Butterworth Filter - Low-pass filter for signal smoothing
 import numpy as np
 
 class ButterworthFilter:
-    def __init__(self, cutoff=100.0, sample_rate=1200.0):
+    def __init__(self, cutoff=20.0, sample_rate=1200.0):
         self.cutoff = cutoff
         self.sample_rate = sample_rate
 

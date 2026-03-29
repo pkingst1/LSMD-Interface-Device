@@ -8,10 +8,10 @@ Stores five (Newton, averaged ADC reading) pairs for later interpolation
 class FivePointCalibration:
     def __init__(self):
         #Samples to discard (transient settling)
-        self.discard_samples = 100
+        self.discard_samples = 3600
  
         #Number of samples to use for averaging
-        self.sample_count = 1000
+        self.sample_count = 1200
  
         #Total samples needed per capture point
         self.total_samples = self.discard_samples + self.sample_count
