@@ -109,41 +109,34 @@ class BluetoothManager(QObject):
     #Automatically discover UUIDs for notify and write characteristics
     async def _discover_uuids(self):
         try:
-            #Run through services
             services = self.client.services
 
-            # =============================================
-            # DEVICE SELECTION: Uncomment ONE block below
-            # =============================================
+            # Try each target service UUID in order — NRF NUS first, ESP32 fallback
+            target_service_uuids = [
+                "6e400001-b5a3-f393-e0a9-e50e24dcca9e",  # Nordic NUS
+                "4fa4a4aa-0001-4000-8000-000000000000",   # ESP32
+            ]
 
-            #Nordic NRF (NUS)
-            #Only discover from nordic UART service
-            TARGET_SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e"
+            for target_uuid in target_service_uuids:
+                for service in services:
+                    if service.uuid != target_uuid:
+                        continue
 
-            #ESP32 peripheral
-            #Uncomment line below and comment line above to use ESP32 peripheral
-            #TARGET_SERVICE_UUID = "4fa4a4aa-0001-4000-8000-000000000000"
+                    for char in service.characteristics:
+                        if "notify" in char.properties and not self.notify_characteristic_uuid:
+                            self.notify_characteristic_uuid = char.uuid
 
-            #Loop through services and characteristics
-            for service in services:
-                #Skip through if not target service
-                if service.uuid != TARGET_SERVICE_UUID:
-                    continue
-                
-                for char in service.characteristics:
-                   
-                    #if has notify and we do not have
-                    if "notify" in char.properties and not self.notify_characteristic_uuid:
-                        self.notify_characteristic_uuid = char.uuid
-                        
+                        if ("write" in char.properties or "write-without-response" in char.properties) and not self.write_characteristic_uuid:
+                            self.write_characteristic_uuid = char.uuid
 
-                    #if has write and we do not have
-                    if ("write" in char.properties or "write-without-response" in char.properties) and not self.write_characteristic_uuid:
-                        self.write_characteristic_uuid = char.uuid   
+                # If both UUIDs found under this service, no need to try next
+                if self.notify_characteristic_uuid and self.write_characteristic_uuid:
+                    break
 
             print(f"\nFinal NOTIFY UUID: {self.notify_characteristic_uuid}")
             print(f"Final WRITE UUID: {self.write_characteristic_uuid}")
-            print("=== End Discovery ===\n")            
+            print("=== End Discovery ===\n")
+
         except Exception as e:
             error_msg = f"UUID discovery error: {str(e)}"
             self.error_occurred.emit(error_msg)
