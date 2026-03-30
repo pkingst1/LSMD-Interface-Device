@@ -256,7 +256,8 @@ class LSMDApplication:
                 connection_type=self.connection_type,
                 device_address=self.connected_device_address,
                 port_name=self.connected_port,
-                baud_rate=self.connected_baud_rate
+                baud_rate=self.connected_baud_rate,
+                sample_rate=self.data_acquisition_window.sample_rate
             )
             self.calibration_window.navigate_to_settings.connect(self.on_navigate_to_settings_from_calibration)
             self.calibration_window.navigate_to_dashboard.connect(self.on_navigate_to_dashboard_from_calibration)
@@ -293,6 +294,11 @@ class LSMDApplication:
         #Route to calibration window if zero calibration is collecting
         if self.calibration_window and self.calibration_window.is_zero_collecting:
             self.calibration_window.append_zero_calibration_data(data)
+            return
+
+        #Route to calibration window if five point calibration is collecting
+        if self.calibration_window and self.calibration_window.is_five_point_collecting:
+            self.calibration_window.append_five_point_calibration_data(data)
             return
 
         #Normal data flow to acquisition window

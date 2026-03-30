@@ -16,8 +16,11 @@ class MovingAverageFilter:
         data = list(force_data)
         return self._moving_average(data, self.window_size)
 
-    #Moving average implementation
+    #Moving average implementation, reflect pads only incomplete first and last 'half' samples
     def _moving_average(self, data, window_size):
+        if len(data) == 0:
+            return []
+
         smoothed = []
         half = window_size // 2
         for i in range(len(data)):

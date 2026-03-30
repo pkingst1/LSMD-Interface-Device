@@ -36,7 +36,7 @@ class DataAcquisitionDashboard(QWidget):
         self.is_acquiring = False
         
 
-        #Data storage for plotting - 10 seconds at 1200Hz = 12,000 points max
+        #Data storage for plotting - 10 seconds at 600Hz = 12,000 points max
         self.sample_rate = 1200  # Hz
         self.max_duration = 10   # seconds
         self.max_data_points = self.sample_rate * self.max_duration

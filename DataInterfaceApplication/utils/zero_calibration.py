@@ -8,10 +8,10 @@ Offset is then subtracted from all subsequent readings.
 class ZeroCalibration:
     def __init__(self):
         #Samples to discard
-        self.discard_samples = 100
+        self.discard_samples = 3600
 
         #Number of samples to use for averaging
-        self.sample_count = 1000
+        self.sample_count = 1200
 
         #Total samples needed
         self.total_samples = self.discard_samples + self.sample_count

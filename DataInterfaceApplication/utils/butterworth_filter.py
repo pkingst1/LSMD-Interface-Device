@@ -5,7 +5,7 @@ Butterworth Filter - Low-pass filter for signal smoothing
 import numpy as np
 
 class ButterworthFilter:
-    def __init__(self, cutoff=100.0, sample_rate=1200.0):
+    def __init__(self, cutoff=20.0, sample_rate=1200.0):
         self.cutoff = cutoff
         self.sample_rate = sample_rate
 
@@ -56,10 +56,21 @@ class ButterworthFilter:
         return output_signal
 
     #Forward backward filtering for zero phase distortion
+    #Reflect pad both ends before forward-backward filtering to avoid IIR boundary transient effects
     def _apply_section_forward_backward(self, numerator_coefficients, denominator_coefficients, input_signal):
-        forward_pass = self._apply_forward(numerator_coefficients, denominator_coefficients, input_signal)
+        #Pad length scales with cutoff, clamped to minimum 100 samples
+        pad_len = max(100, int(7.0 * self.sample_rate / self.cutoff))
+
+        left_pad  = input_signal[1 : pad_len + 1][::-1]
+        right_pad = input_signal[-(pad_len + 1) : -1][::-1]
+        padded    = np.concatenate([left_pad, input_signal, right_pad])
+
+        forward_pass  = self._apply_forward(numerator_coefficients, denominator_coefficients, padded)
         backward_pass = self._apply_forward(numerator_coefficients, denominator_coefficients, forward_pass[::-1])
-        return backward_pass[::-1]
+        zero_phase    = backward_pass[::-1]
+
+        #Remove padding, return same length as original input
+        return zero_phase[pad_len : pad_len + len(input_signal)]
 
     #Cascade both biquad sections in series
     def apply(self, force_data):
