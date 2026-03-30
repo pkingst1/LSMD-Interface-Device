@@ -24,7 +24,7 @@ class CalibrationWindow(QWidget):
     zero_calibration_complete = pyqtSignal(float)
     zero_status_updated = pyqtSignal(float, bool)
  
-    def __init__(self, connection_type="usb", device_address=None, port_name=None, baud_rate=None):
+    def __init__(self, connection_type="usb", device_address=None, port_name=None, baud_rate=None, sample_rate=1200.0):
         super().__init__()
  
         #Store connection info for top bar display
