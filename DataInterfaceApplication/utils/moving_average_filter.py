@@ -16,30 +16,18 @@ class MovingAverageFilter:
         data = list(force_data)
         return self._moving_average(data, self.window_size)
 
-    #Moving average implementation — clamps window at edges instead of shrinking
+    #Moving average implementation, reflect pads only incomplete first and last 'half' samples
     def _moving_average(self, data, window_size):
         if len(data) == 0:
             return []
 
         smoothed = []
         half = window_size // 2
-        last_valid_start = len(data) - window_size
-
         for i in range(len(data)):
-            #Clamp the window start so it never shrinks at edges
-            #At the beginning: window stays anchored at index 0
-            #At the end: window stays anchored so it always contains window_size samples
-            start = max(0, min(i - half, last_valid_start))
-            end = start + window_size
-
-            #If data is shorter than window size, just use all data
-            if end > len(data):
-                start = 0
-                end = len(data)
-
+            start = max(0, i - half)
+            end = min(len(data), i + half + 1)
             window = data[start:end]
             smoothed.append(sum(window) / len(window))
-
         return smoothed
 
     #Set window size

@@ -307,7 +307,14 @@ class BluetoothWorker(QThread):
                         else:
                             break
 
-                self.loop.close()
+                #Drain pending WinRT BLE callbacks before closing loop
+                try:
+                    self.loop.run_until_complete(asyncio.sleep(0.15))
+                except Exception:
+                    pass
+                finally:
+                    if not self.loop.is_closed():
+                        self.loop.close()
                 
         except Exception as e:
             if self.loop and not self.loop.is_closed():
@@ -356,7 +363,6 @@ class BluetoothWorker(QThread):
             self.auto_reconnect = False
             self.last_connected_address = None  #clear stored address
             self._run_in_loop(self.manager.disconnect())
-            self.loop.call_soon_threadsafe(self.loop.stop)
             
 
     #send data to device
