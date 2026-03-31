@@ -904,7 +904,7 @@ class SettingsWindow(QWidget):
         self.inactivity_label.setVisible(False)
         card_layout.addWidget(self.inactivity_label)
  
-        self.inactivity_input = QLineEdit("30")
+        self.inactivity_input = QLineEdit("5")
         self.inactivity_input.setStyleSheet("""
             QLineEdit {
                 background-color: #F5F5F5;
@@ -949,7 +949,7 @@ class SettingsWindow(QWidget):
         auto_reconnect_text_layout.addWidget(auto_reconnect_sub)
  
         self.auto_reconnect_toggle = ToggleSwitch()
-        self.auto_reconnect_toggle.setChecked(True)
+        self.auto_reconnect_toggle.setChecked(False) #off by default
         self.auto_reconnect_toggle.toggled.connect(self.auto_reconnect_changed.emit)
  
         auto_reconnect_layout.addLayout(auto_reconnect_text_layout)

@@ -53,6 +53,9 @@ class DataAcquisitionDashboard(QWidget):
         self.rate_start_line = None
         self.rate_end_line = None
 
+        self.peak_force = 0.0  #peak force value for export (N)
+        self.rfd = None        #rate of force development for export (N/s), None if not calculated
+
         self.zero_offset = 0.0
         
         self.init_ui()
@@ -702,23 +705,30 @@ class DataAcquisitionDashboard(QWidget):
         #Save file dialog (in settings in future)
         file_path, _ = QFileDialog.getSaveFileName(
             self,
-            "Save CSV File", #Window title
-            "force_data.csv", #Default file name
-            "CSV Files (*.csv)" #File filter
+            "Save CSV File",       #Window title
+            "lsmd_data.csv",       #Default file name
+            "CSV Files (*.csv)"    #File filter
         )
 
         #If closed without selecting file, return
         if not file_path:
             return
         
-        #Dataframe with time time and force data
+        #Dataframe with time and force columns
         df = pd.DataFrame({
             "Time (s)": list(self.time_data),
-            "Force (N)": list(self.force_data)}
+            "Force (N)": [round(f, 2) for f in self.force_data]}
         )
 
+        #Peak force and RFD written to row 1 only — remaining rows left blank
+        peak_col = [f"{self.peak_force:.1f}"] + [""] * (len(self.time_data) - 1)
+        rate_col  = [f"{self.rfd:.2f}" if self.rfd is not None else "—"] + [""] * (len(self.time_data) - 1)
+
+        df["Peak Force (N)"]           = peak_col
+        df["Rate of Force Dev (N/s)"]  = rate_col
+
         #Write dataframe to CSV
-        df.to_csv(file_path, index=False) #prevent row index
+        df.to_csv(file_path, index=False)
         print(f"Data exported to {file_path}")
     
     #Update button styles based on acquisition state
@@ -864,6 +874,7 @@ class DataAcquisitionDashboard(QWidget):
                 self.plot_widget.setYRange(max(0, min_force - margin), max_force + margin)
 
                 #Update peak value
+                self.peak_force = max_force
                 self.peak_value_label.setText(f"{max_force:.1f} N")
 
             self.stats_data_points.setText(str(self.data_point_count))
@@ -1058,6 +1069,7 @@ class DataAcquisitionDashboard(QWidget):
 
         #Reject if end is before start
         if end_time <= start_time:
+            self.rfd = None
             self.rate_value_label.setText("—")
             return
 
@@ -1070,6 +1082,7 @@ class DataAcquisitionDashboard(QWidget):
 
         #cannot be same
         if start_index == end_index:
+            self.rfd = None
             self.rate_value_label.setText("—")
             return
 
@@ -1078,10 +1091,12 @@ class DataAcquisitionDashboard(QWidget):
 
         #cannot be zero
         if delta_time == 0:
+            self.rfd = None
             self.rate_value_label.setText("—")
             return
 
         rate = delta_force / delta_time
+        self.rfd = rate  #store for export
         self.rate_value_label.setText(f"{rate:.2f} N/s")
 
     #Draw rate lines on plot

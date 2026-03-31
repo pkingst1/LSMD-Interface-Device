@@ -45,13 +45,15 @@ class BluetoothManager(QObject):
 
             #Loop through each device found
             for device in devices:
-                #Assign name if exists
-                name = device.name if device.name else "Unknown"
-                #MAC address
+                #Remove devices with no name (Unknown)
+                if not device.name:
+                    continue
+                
+                name = device.name
                 address = device.address
 
-                self.device_found.emit(name, address)   #signal device found
-                found_devices.append((name, address))   #add device to list
+                self.device_found.emit(name, address)
+                found_devices.append((name, address))
             
             #Scanning complete
             self.scan_complete.emit(found_devices)
@@ -64,21 +66,27 @@ class BluetoothManager(QObject):
     
     #Connect to device by MAC address
     async def connect_to_device(self, address):
-        
         try:
-            #Clean up existing client
+            # Clean up existing client
             if self.client is not None:
                 try:
                     if self.client.is_connected:
+                        if self.notify_characteristic_uuid:
+                            try:
+                                await self.client.stop_notify(self.notify_characteristic_uuid)
+                            except Exception:
+                                pass
                         await self.client.disconnect()
                 except Exception:
                     pass
                 self.client = None
+                self.notify_characteristic_uuid = None
+                self.write_characteristic_uuid = None
 
-            #BleakClient object, manages connection
-            #calls function on disconnect
+            # BleakClient object, manages connection
+            # calls function on disconnect
             self.client = BleakClient(address,
-                                      disconnected_callback=self._on_disconnect)
+                                    disconnected_callback=self._on_disconnect)
             
             #Connect
             await self.client.connect()
@@ -88,6 +96,10 @@ class BluetoothManager(QObject):
                 self.is_connected = True
                 self.connected_device = address     #device connected to
                 device_name = address               #use address as name
+
+                print(f"Negotiated MTU: {self.client.mtu_size}") #prints negotiated mtu size
+
+                await asyncio.sleep(1.0) #wait for 1 second for security handshake
 
                 await self._discover_uuids()        #discover uuids
 
@@ -145,15 +157,18 @@ class BluetoothManager(QObject):
     async def disconnect(self):
         try:
             if self.client and self.is_connected:
+                if self.notify_characteristic_uuid:
+                    try:
+                        await self.client.stop_notify(self.notify_characteristic_uuid)
+                    except Exception:
+                        pass
                 await self.client.disconnect()
 
-                #update
                 self.is_connected = False
                 self.connected_device = None
                 self.notify_characteristic_uuid = None
                 self.write_characteristic_uuid = None
         except Exception as e:
-            #still update if fails
             self.is_connected = False
             self.connected_device = None
             self.notify_characteristic_uuid = None
@@ -330,10 +345,11 @@ class BluetoothWorker(QThread):
     #scan for devices
     def scan(self, timeout=5.0):
         if self.isRunning():
-            self.error.emit("Already running")
-            return
-        self.operation = "scan"                 #tell run() to scan
-        self.params = {'timeout': timeout}      #store timeout
+            # If we're connected, disconnect first
+            self.disconnect_device()
+            self.wait()  # wait for the thread to finish
+        self.operation = "scan"
+        self.params = {'timeout': timeout}
         self.start()
         
     #connect to a device
