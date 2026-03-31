@@ -832,8 +832,7 @@ class DataAcquisitionDashboard(QWidget):
                 time_value = self.data_point_count / self.sample_rate
 
                 #Apply zero calibration offset
-                #0.6 is a calculated calibration factor for the samples
-                corrected_value = (force_value * 0.6) - self.zero_offset
+                corrected_value = (force_value * 1.0) - self.zero_offset
 
                 self.time_data.append(time_value)
                 self.force_data.append(corrected_value)
