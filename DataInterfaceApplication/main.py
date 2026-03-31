@@ -4,6 +4,9 @@ Run this file to start the program
 """
 
 import sys
+import json
+import os
+
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import (QFont, QPalette, QColor)
 
@@ -35,7 +38,8 @@ class LSMDApplication:
 
         #Bluetooth worker for connections
         self.bluetooth_worker = None
-        self.connected_device_address = None
+        self.connected_device_name = None
+        self.load_config()
 
         #USB worker for connections
         self.usb_worker = None
@@ -101,24 +105,34 @@ class LSMDApplication:
     def on_bluetooth_connection(self):
         print("Bluetooth selected")
 
-        #Show device selection dialog
-        self.device_selection_window = DeviceSelection(connection_type="bluetooth",parent=self.connection_window)
+        self.device_selection_window = DeviceSelection(
+            connection_type="bluetooth",
+            last_ble_address=self.connected_device_address,
+            last_ble_name=self.connected_device_name,
+            parent=self.connection_window
+        )
         
-        #Connect the device selected signal to handler
         self.device_selection_window.device_selected.connect(self.on_device_selected)
 
-        #Block interaction with parent window
         result = self.device_selection_window.exec()
 
-        #Check if user cancelled
         if result == DeviceSelection.DialogCode.Rejected:
             self.connection_window.update_connection_status(None)
-    
+        
     #User selects device from window
     def on_device_selected(self, device_address):
         #Store address
         self.connected_device_address = device_address
         self.connection_type = "bluetooth"
+
+        #Get the name from the device selection window
+        if self.device_selection_window and self.device_selection_window.devices:
+            for name, address in self.device_selection_window.devices:
+                if address == device_address:
+                    self.connected_device_name = name
+                    break
+        else:
+            self.connected_device_name = device_address
 
         #Check and create Bluetooth worker
         if self.bluetooth_worker is None:
@@ -134,10 +148,12 @@ class LSMDApplication:
 
         #Connection
         self.bluetooth_worker.connect(device_address)
+
     #Connection succeeds
     def on_bluetooth_connected(self, success):
         if success:
             print(f"Successfully connected to Bluetooth device: {self.connected_device_address}")
+            self.save_config()
 
             #hide connection window
             self.connection_window.hide()
@@ -353,7 +369,6 @@ class LSMDApplication:
     #Bluetooth disconnects
     def on_bluetooth_disconnected(self):
         print(f"Bluetooth device disconnected")
-        self.connected_device_address = None
         self.connection_window.update_connection_status(None)
 
     #Error occurs
@@ -438,6 +453,31 @@ class LSMDApplication:
             self.bluetooth_worker.set_auto_reconnect_enable(enabled)
         elif self.connection_type == "usb" and self.usb_worker:
             self.usb_worker.set_auto_reconnect(enabled)
+
+    #Load config from json file
+    def load_config(self):
+        config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+        try:
+            with open(config_path, "r") as f:
+                config = json.load(f)
+                self.connected_device_address = config.get("last_ble_address", None)
+                self.connected_device_name = config.get("last_ble_name", None)
+        except (FileNotFoundError, json.JSONDecodeError):
+            self.connected_device_address = None
+            self.connected_device_name = None
+    
+    #Save config to json file
+    def save_config(self):
+        config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+        config = {
+            "last_ble_address": self.connected_device_address,
+            "last_ble_name": self.connected_device_name
+        }
+        try:
+            with open(config_path, "w") as f:
+                json.dump(config, f, indent=4)
+        except Exception as e:
+            print(f"Failed to save config: {e}")
     
 #Main app
 def main():

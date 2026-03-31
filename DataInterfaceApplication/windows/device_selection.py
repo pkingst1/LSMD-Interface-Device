@@ -17,13 +17,15 @@ class DeviceSelection(QDialog):
     device_selected = pyqtSignal(str)           #address
     usb_device_selected = pyqtSignal(str, int)  #port name, baud rate
 
-    def __init__(self, connection_type, parent=None):    #no parent by default
+    def __init__(self, connection_type, last_ble_address=None, last_ble_name=None, parent=None):    #no parent by default
         super().__init__(parent)
 
-        self.connection_type = connection_type  #bluetooth or usb
-        self.devices = []               #list for devices
-        self.selected_device = None     #store selected device
-        self.is_scanning = False        #track if scanning
+        self.connection_type = connection_type
+        self.last_ble_address = last_ble_address
+        self.last_ble_name = last_ble_name or last_ble_address
+        self.devices = []
+        self.selected_device = None
+        self.is_scanning = False
 
         #Create worker based on connection type
         if self.connection_type == "bluetooth":
@@ -36,8 +38,11 @@ class DeviceSelection(QDialog):
 
         self.init_ui()
 
-        #Start scan automatically
-        QTimer.singleShot(100, self.start_scan)
+        #Start scan automatically - skip if reconnect available
+        if not (self.connection_type == "bluetooth" and self.last_ble_address):
+            QTimer.singleShot(100, self.start_scan)
+        else:
+            self.scan_button.show()
     
     #Initialize UI
     def init_ui(self):
@@ -126,7 +131,7 @@ class DeviceSelection(QDialog):
 
         #Placeholder
         if self.connection_type == "bluetooth":
-            self.device_combo.addItem("No devices found - Click 'Rescan'")
+            self.device_combo.addItem("No devices found - Scan for devices")
         else:
             self.device_combo.addItem("No ports found - Click 'Rescan'")
         
@@ -190,8 +195,8 @@ class DeviceSelection(QDialog):
 
         layout.addSpacing(10)
 
-        #Rescan
-        self.scan_button = QPushButton("Rescan for Devices")
+        #Scan button
+        self.scan_button = QPushButton("Scan for Devices")
         self.scan_button.setMinimumHeight(40)
         self.scan_button.setStyleSheet("""
             QPushButton {
@@ -208,6 +213,25 @@ class DeviceSelection(QDialog):
         self.scan_button.clicked.connect(self.start_scan)
         self.scan_button.hide() #show after first scan completes
         layout.addWidget(self.scan_button)
+
+
+        #Reconnect button
+        if self.connection_type == "bluetooth" and self.last_ble_address:
+            self.reconnect_button = QPushButton(f"Reconnect to last device ({self.last_ble_name})")
+            self.reconnect_button.setMinimumHeight(40)
+            self.reconnect_button.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.reconnect_button.setStyleSheet("""
+                QPushButton {
+                    background-color: white;
+                    border: 2px solid #E0E0E0;
+                    border-radius: 6px;
+                    padding: 8px 12px;
+                    font-size: 14px;
+                    color: #1A1A1A;
+                }
+            """)
+            self.reconnect_button.clicked.connect(self.on_reconnect_clicked)
+            layout.addWidget(self.reconnect_button)
 
         #Connect button
         self.connect_button = QPushButton("Connect to Device")
@@ -375,3 +399,8 @@ class DeviceSelection(QDialog):
         if self.connection_type == "usb":
             return int(self.baud_rate_combo.currentText())
         return None
+
+    #On reconnect device
+    def on_reconnect_clicked(self):
+        self.device_selected.emit(self.last_ble_address)
+        self.accept()
