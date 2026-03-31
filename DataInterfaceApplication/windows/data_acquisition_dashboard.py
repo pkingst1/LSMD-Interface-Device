@@ -36,7 +36,7 @@ class DataAcquisitionDashboard(QWidget):
         self.is_acquiring = False
         
 
-        #Data storage for plotting - 10 seconds at 1200Hz = 12,000 points max
+        #Data storage for plotting - 10 seconds at 600Hz = 12,000 points max
         self.sample_rate = 1200  # Hz
         self.max_duration = 10   # seconds
         self.max_data_points = self.sample_rate * self.max_duration
@@ -52,6 +52,11 @@ class DataAcquisitionDashboard(QWidget):
         self.acquisition_timer.timeout.connect(self._on_acquisition_timeout)
         self.rate_start_line = None
         self.rate_end_line = None
+
+        self.peak_force = 0.0  #peak force value for export (N)
+        self.rfd = None        #rate of force development for export (N/s), None if not calculated
+
+        self.zero_offset = 0.0
         
         self.init_ui()
 
@@ -200,17 +205,23 @@ class DataAcquisitionDashboard(QWidget):
         row2.addWidget(navigation_widget)
         row2.addStretch(1)
         
+        """
+        ---------------
+        Uncomment this section to add back the switch view button
+        ---------------
+        
         #Switch view button
         self.switch_view_button = QPushButton("Switch to Debug View")
         self.switch_view_button.setMinimumHeight(32)
         self.switch_view_button.setStyleSheet("""
-            QPushButton {
-                font-size: 11px;
-                font-weight: 500;
-            }
+            #QPushButton {
+               # font-size: 11px;
+               # font-weight: 500;
+           # }
         """)
         self.switch_view_button.clicked.connect(self.on_switch_view_clicked)
         row2.addWidget(self.switch_view_button)
+        """
         row2.addStretch(1)
 
         #Disconnect button
@@ -694,23 +705,30 @@ class DataAcquisitionDashboard(QWidget):
         #Save file dialog (in settings in future)
         file_path, _ = QFileDialog.getSaveFileName(
             self,
-            "Save CSV File", #Window title
-            "force_data.csv", #Default file name
-            "CSV Files (*.csv)" #File filter
+            "Save CSV File",       #Window title
+            "lsmd_data.csv",       #Default file name
+            "CSV Files (*.csv)"    #File filter
         )
 
         #If closed without selecting file, return
         if not file_path:
             return
         
-        #Dataframe with time time and force data
+        #Dataframe with time and force columns
         df = pd.DataFrame({
             "Time (s)": list(self.time_data),
-            "Force (N)": list(self.force_data)}
+            "Force (N)": [round(f, 2) for f in self.force_data]}
         )
 
+        #Peak force and RFD written to row 1 only — remaining rows left blank
+        peak_col = [f"{self.peak_force:.1f}"] + [""] * (len(self.time_data) - 1)
+        rate_col  = [f"{self.rfd:.2f}" if self.rfd is not None else "—"] + [""] * (len(self.time_data) - 1)
+
+        df["Peak Force (N)"]           = peak_col
+        df["Rate of Force Dev (N/s)"]  = rate_col
+
         #Write dataframe to CSV
-        df.to_csv(file_path, index=False) #prevent row index
+        df.to_csv(file_path, index=False)
         print(f"Data exported to {file_path}")
     
     #Update button styles based on acquisition state
@@ -806,12 +824,20 @@ class DataAcquisitionDashboard(QWidget):
             try:
                 force_value = float(line)
 
+                #Reject values outside of expected 10 bit range (0-1023)
+                if force_value < 0 or force_value > 1023:
+                    continue
+
                 #Calculate time from sample count
                 time_value = self.data_point_count / self.sample_rate
 
+                #Apply zero calibration offset
+                #0.6 is a calculated calibration factor for the samples
+                corrected_value = (force_value * 0.6) - self.zero_offset
+
                 self.time_data.append(time_value)
-                self.force_data.append(force_value)
-                self.raw_force_data.append(force_value)
+                self.force_data.append(corrected_value)
+                self.raw_force_data.append(corrected_value)
                 self.data_point_count += 1
 
                 #Update plot every 60 points (~50ms at 1200 Hz)
@@ -848,10 +874,15 @@ class DataAcquisitionDashboard(QWidget):
                 self.plot_widget.setYRange(max(0, min_force - margin), max_force + margin)
 
                 #Update peak value
+                self.peak_force = max_force
                 self.peak_value_label.setText(f"{max_force:.1f} N")
 
             self.stats_data_points.setText(str(self.data_point_count))
             self.stats_duration.setText(f"{max_time:.1f} s")
+
+            #Send heartbeat to confirm updating
+            #if self.is_acquiring:
+            #    self.send_data.emit("stop")
     
     #Apply ordered list of filters to raw data, or revert if list is empty
     def apply_filter(self, filter_list):
@@ -1035,6 +1066,13 @@ class DataAcquisitionDashboard(QWidget):
 
     #Calculate average rate of force development
     def calculate_rate(self, start_time, end_time):
+
+        #Reject if end is before start
+        if end_time <= start_time:
+            self.rfd = None
+            self.rate_value_label.setText("—")
+            return
+
         time_list = list(self.time_data)
         force_list = list(self.force_data)
 
@@ -1044,6 +1082,7 @@ class DataAcquisitionDashboard(QWidget):
 
         #cannot be same
         if start_index == end_index:
+            self.rfd = None
             self.rate_value_label.setText("—")
             return
 
@@ -1052,10 +1091,12 @@ class DataAcquisitionDashboard(QWidget):
 
         #cannot be zero
         if delta_time == 0:
+            self.rfd = None
             self.rate_value_label.setText("—")
             return
 
         rate = delta_force / delta_time
+        self.rfd = rate  #store for export
         self.rate_value_label.setText(f"{rate:.2f} N/s")
 
     #Draw rate lines on plot

@@ -45,13 +45,15 @@ class BluetoothManager(QObject):
 
             #Loop through each device found
             for device in devices:
-                #Assign name if exists
-                name = device.name if device.name else "Unknown"
-                #MAC address
+                #Remove devices with no name (Unknown)
+                if not device.name:
+                    continue
+                
+                name = device.name
                 address = device.address
 
-                self.device_found.emit(name, address)   #signal device found
-                found_devices.append((name, address))   #add device to list
+                self.device_found.emit(name, address)
+                found_devices.append((name, address))
             
             #Scanning complete
             self.scan_complete.emit(found_devices)
@@ -64,21 +66,27 @@ class BluetoothManager(QObject):
     
     #Connect to device by MAC address
     async def connect_to_device(self, address):
-        
         try:
-            #Clean up existing client
+            # Clean up existing client
             if self.client is not None:
                 try:
                     if self.client.is_connected:
+                        if self.notify_characteristic_uuid:
+                            try:
+                                await self.client.stop_notify(self.notify_characteristic_uuid)
+                            except Exception:
+                                pass
                         await self.client.disconnect()
                 except Exception:
                     pass
                 self.client = None
+                self.notify_characteristic_uuid = None
+                self.write_characteristic_uuid = None
 
-            #BleakClient object, manages connection
-            #calls function on disconnect
+            # BleakClient object, manages connection
+            # calls function on disconnect
             self.client = BleakClient(address,
-                                      disconnected_callback=self._on_disconnect)
+                                    disconnected_callback=self._on_disconnect)
             
             #Connect
             await self.client.connect()
@@ -88,6 +96,10 @@ class BluetoothManager(QObject):
                 self.is_connected = True
                 self.connected_device = address     #device connected to
                 device_name = address               #use address as name
+
+                print(f"Negotiated MTU: {self.client.mtu_size}") #prints negotiated mtu size
+
+                await asyncio.sleep(1.0) #wait for 1 second for security handshake
 
                 await self._discover_uuids()        #discover uuids
 
@@ -109,41 +121,34 @@ class BluetoothManager(QObject):
     #Automatically discover UUIDs for notify and write characteristics
     async def _discover_uuids(self):
         try:
-            #Run through services
             services = self.client.services
 
-            # =============================================
-            # DEVICE SELECTION: Uncomment ONE block below
-            # =============================================
+            # Try each target service UUID in order — NRF NUS first, ESP32 fallback
+            target_service_uuids = [
+                "6e400001-b5a3-f393-e0a9-e50e24dcca9e",  # Nordic NUS
+                "4fa4a4aa-0001-4000-8000-000000000000",   # ESP32
+            ]
 
-            #Nordic NRF (NUS)
-            #Only discover from nordic UART service
-            TARGET_SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e"
+            for target_uuid in target_service_uuids:
+                for service in services:
+                    if service.uuid != target_uuid:
+                        continue
 
-            #ESP32 peripheral
-            #Uncomment line below and comment line above to use ESP32 peripheral
-            # TARGET_SERVICE_UUID = "4fa4a4aa-0001-4000-8000-000000000000"
+                    for char in service.characteristics:
+                        if "notify" in char.properties and not self.notify_characteristic_uuid:
+                            self.notify_characteristic_uuid = char.uuid
 
-            #Loop through services and characteristics
-            for service in services:
-                #Skip through if not target service
-                if service.uuid != TARGET_SERVICE_UUID:
-                    continue
-                
-                for char in service.characteristics:
-                   
-                    #if has notify and we do not have
-                    if "notify" in char.properties and not self.notify_characteristic_uuid:
-                        self.notify_characteristic_uuid = char.uuid
-                        
+                        if ("write" in char.properties or "write-without-response" in char.properties) and not self.write_characteristic_uuid:
+                            self.write_characteristic_uuid = char.uuid
 
-                    #if has write and we do not have
-                    if ("write" in char.properties or "write-without-response" in char.properties) and not self.write_characteristic_uuid:
-                        self.write_characteristic_uuid = char.uuid   
+                # If both UUIDs found under this service, no need to try next
+                if self.notify_characteristic_uuid and self.write_characteristic_uuid:
+                    break
 
             print(f"\nFinal NOTIFY UUID: {self.notify_characteristic_uuid}")
             print(f"Final WRITE UUID: {self.write_characteristic_uuid}")
-            print("=== End Discovery ===\n")            
+            print("=== End Discovery ===\n")
+
         except Exception as e:
             error_msg = f"UUID discovery error: {str(e)}"
             self.error_occurred.emit(error_msg)
@@ -152,15 +157,18 @@ class BluetoothManager(QObject):
     async def disconnect(self):
         try:
             if self.client and self.is_connected:
+                if self.notify_characteristic_uuid:
+                    try:
+                        await self.client.stop_notify(self.notify_characteristic_uuid)
+                    except Exception:
+                        pass
                 await self.client.disconnect()
 
-                #update
                 self.is_connected = False
                 self.connected_device = None
                 self.notify_characteristic_uuid = None
                 self.write_characteristic_uuid = None
         except Exception as e:
-            #still update if fails
             self.is_connected = False
             self.connected_device = None
             self.notify_characteristic_uuid = None
@@ -307,7 +315,14 @@ class BluetoothWorker(QThread):
                         else:
                             break
 
-                self.loop.close()
+                #Drain pending WinRT BLE callbacks before closing loop
+                try:
+                    self.loop.run_until_complete(asyncio.sleep(0.15))
+                except Exception:
+                    pass
+                finally:
+                    if not self.loop.is_closed():
+                        self.loop.close()
                 
         except Exception as e:
             if self.loop and not self.loop.is_closed():
@@ -330,10 +345,11 @@ class BluetoothWorker(QThread):
     #scan for devices
     def scan(self, timeout=5.0):
         if self.isRunning():
-            self.error.emit("Already running")
-            return
-        self.operation = "scan"                 #tell run() to scan
-        self.params = {'timeout': timeout}      #store timeout
+            # If we're connected, disconnect first
+            self.disconnect_device()
+            self.wait()  # wait for the thread to finish
+        self.operation = "scan"
+        self.params = {'timeout': timeout}
         self.start()
         
     #connect to a device
@@ -356,7 +372,6 @@ class BluetoothWorker(QThread):
             self.auto_reconnect = False
             self.last_connected_address = None  #clear stored address
             self._run_in_loop(self.manager.disconnect())
-            self.loop.call_soon_threadsafe(self.loop.stop)
             
 
     #send data to device

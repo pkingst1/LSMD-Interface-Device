@@ -11,8 +11,8 @@ class ToggleSwitch(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedSize(40, 20)
-        self.checked = False
+        self.setFixedSize(34, 18)
+        self._checked = False
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
     def isChecked(self):
@@ -37,10 +37,10 @@ class ToggleSwitch(QWidget):
         else:
             painter.setBrush(QBrush(QColor("#CCCCCC")))
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawRoundedRect(0, 3, 48, 20, 10, 10)
+        painter.drawRoundedRect(0, 1, 34, 16, 8, 8)
 
         #Knob
         painter.setBrush(QBrush(QColor("#FFFFFF")))
-        knob_x = 26 if self._checked else 2
-        painter.drawEllipse(knob_x, 1, 24, 24)
+        knob_x = 18 if self._checked else 2
+        painter.drawEllipse(knob_x, 2, 14, 14)
         painter.end()
