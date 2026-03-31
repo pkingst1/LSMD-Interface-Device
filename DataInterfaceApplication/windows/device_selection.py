@@ -131,7 +131,7 @@ class DeviceSelection(QDialog):
 
         #Placeholder
         if self.connection_type == "bluetooth":
-            self.device_combo.addItem("No devices found - Scan for devices")
+            self.device_combo.addItem("Click - 'Scan' for devices")
         else:
             self.device_combo.addItem("No ports found - Click 'Rescan'")
         
