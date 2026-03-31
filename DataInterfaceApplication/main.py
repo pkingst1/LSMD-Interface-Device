@@ -132,7 +132,9 @@ class LSMDApplication:
                     self.connected_device_name = name
                     break
         else:
-            self.connected_device_name = device_address
+            #Keep existing name if have one
+            if not self.connected_device_name:
+                self.connected_device_name = device_address
 
         #Check and create Bluetooth worker
         if self.bluetooth_worker is None:
