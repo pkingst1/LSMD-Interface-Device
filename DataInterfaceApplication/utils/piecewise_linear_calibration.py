@@ -30,6 +30,10 @@ Interpolation formula between two bracketing points:
 For ADC values outside the calibration range, extrapolation uses the slope
 of the nearest segment (first or last pair of calibration points).
 """
+
+import json
+import os
+from datetime import date
  
 class PiecewiseLinearCalibration:
     def __init__(self):
@@ -39,6 +43,8 @@ class PiecewiseLinearCalibration:
  
         #Flag indicating whether calibration data has been loaded
         self.is_calibrated = False
+
+        self.calibration_date = None
  
     #Load calibration points and build the sorted lookup table
     #Points are (newton_value, adc_value) tuples from the 5-point capture process
@@ -106,35 +112,13 @@ class PiecewiseLinearCalibration:
         adc_high, newton_high = table[-1]
         return adc_low, newton_low, adc_high, newton_high
  
-    #Compute interpolated results for each calibration point
-    #Used by the results card to evaluate calibration accuracy
-    #Returns list of dicts with entered, interpolated, and error values
-    def get_interpolated_results(self, calibration_points):
+    #Get calibration points for display in results card
+    #Returns list of dicts with newton_entered and adc_captured
+    def get_display_points(self):
         if not self.is_calibrated:
             return []
- 
-        results = []
-        for newton_entered, adc_captured in calibration_points:
-            interpolated_newton = self.adc_to_newtons(adc_captured)
- 
-            #Absolute error between interpolated output and known reference value
-            error_absolute = abs(interpolated_newton - newton_entered)
- 
-            #Percent error relative to the entered reference value
-            if newton_entered != 0:
-                error_percent = (error_absolute / abs(newton_entered)) * 100
-            else:
-                error_percent = 0.0 if error_absolute == 0 else float('inf')
- 
-            results.append({
-                'newton_entered': newton_entered,
-                'adc_captured': adc_captured,
-                'newton_interpolated': interpolated_newton,
-                'error_absolute': error_absolute,
-                'error_percent': error_percent
-            })
- 
-        return results
+        #lookup_table is (adc, newton) sorted by adc — return as (newton, adc) for display
+        return [{'newton_entered': newton, 'adc_captured': adc} for adc, newton in self.lookup_table]
  
     #Get the sorted lookup table (for persistence/debugging)
     def get_lookup_table(self):
@@ -144,3 +128,33 @@ class PiecewiseLinearCalibration:
     def reset(self):
         self.lookup_table = []
         self.is_calibrated = False
+
+    #Save lookup table and calibration date to JSON
+    def save_to_file(self, file_path):
+        data = {
+            "lookup_table": self.lookup_table,
+            "calibration_date": date.today().isoformat()  #eg "2026-04-01"
+        }
+        with open(file_path, 'w') as f:
+            json.dump(data, f, indent=2)
+
+    #Load lookup table from JSON, restores calibrated state
+    def load_from_file(self, file_path):
+        if not os.path.exists(file_path):
+            return False
+        try:
+            with open(file_path, 'r') as f:
+                data = json.load(f)
+            self.lookup_table = [tuple(pair) for pair in data["lookup_table"]]
+            self.is_calibrated = len(self.lookup_table) >= 2
+
+            #Parse date if present — may be absent in older calibration files
+            date_str = data.get("calibration_date", "")
+            if date_str:
+                self.calibration_date = date.fromisoformat(date_str)
+            else:
+                self.calibration_date = None
+
+            return self.is_calibrated
+        except Exception:
+            return False

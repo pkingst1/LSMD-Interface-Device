@@ -9,6 +9,7 @@ import os
 
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import (QFont, QPalette, QColor)
+from PyQt6.QtCore import QTimer, QEvent, QObject
 
 from windows.connection_window import ConnectionWindow
 from windows.device_selection import DeviceSelection
@@ -19,10 +20,15 @@ from windows.settings_window import SettingsWindow
 from utils.bluetooth_manager import BluetoothWorker
 from utils.usb_manager import USBWorker
 from utils.zero_calibration import ZeroCalibration
+from utils.piecewise_linear_calibration import PiecewiseLinearCalibration
+
+#Path to calibration file
+CAL_FILE = os.path.join(os.path.dirname(__file__), "calibration.json")
 
 #Main Application Controller
-class LSMDApplication:
+class LSMDApplication(QObject):
     def __init__(self):
+        super().__init__()
         self.app = QApplication(sys.argv)
         self.setup_application()
 
@@ -48,6 +54,20 @@ class LSMDApplication:
 
         #Zero calibration for force measurements
         self.zero_calibration = ZeroCalibration()
+
+        #Inactivity timer for automatic turn-off
+        self.inactivity_timer = QTimer()
+        self.inactivity_timer.setSingleShot(True)
+        self.inactivity_timer.timeout.connect(self.on_inactivity_timeout)
+        self.auto_turn_off_enabled = False
+
+        #Piecewise linear calibration - saved across sessions
+        self.piecewise_calibration = PiecewiseLinearCalibration()
+        loaded = self.piecewise_calibration.load_from_file(CAL_FILE)
+        if loaded:
+            print(f"Calibration loaded — {len(self.piecewise_calibration.lookup_table)} points")
+        else:
+            print("No saved calibration — 5-point calibration required before measurements")
 
         #Track connection type
         self.connection_type = None
@@ -199,6 +219,9 @@ class LSMDApplication:
         self.data_acquisition_window.disconnect_request.connect(self.on_disconnect_request)
         #send
         self.data_acquisition_window.send_data.connect(self.on_send_data)
+        #Apply saved piecewise calibration if available
+        if self.piecewise_calibration.is_calibrated:
+            self.data_acquisition_window.piecewise_cal = self.piecewise_calibration
 
         self.data_acquisition_window.show()
         self.data_acquisition_window.setGeometry(self._saved_geometry) #Restore size
@@ -223,10 +246,14 @@ class LSMDApplication:
             self.settings_window.filter_settings_changed.connect(self.on_filter_settings_changed)
             self.settings_window.navigate_to_calibration.connect(self.on_navigate_to_calibration)
             self.settings_window.auto_reconnect_changed.connect(self.on_auto_reconnect_changed)
-
+            self.settings_window.auto_turn_off_changed.connect(self.on_auto_turn_off_changed)
 
         self.settings_window.setGeometry(self._saved_geometry) #Restore size
         self.settings_window.show()
+
+        #Update 5-point calibration date if available
+        if self.piecewise_calibration.is_calibrated and self.piecewise_calibration.calibration_date:
+            self.settings_window.update_five_point_status(self.piecewise_calibration.calibration_date)
     
     #Filter settings changed
     def on_filter_settings_changed(self):
@@ -283,6 +310,11 @@ class LSMDApplication:
             self.calibration_window.send_data.connect(self.on_send_data)
             self.calibration_window.zero_calibration_complete.connect(self.on_zero_calibration_complete)
             self.calibration_window.zero_status_updated.connect(self.on_zero_status_updated)
+            self.calibration_window.five_point_calibration_complete.connect(self.on_five_point_calibration_complete)
+        
+        #Restore saved calibration into window if available
+        if self.piecewise_calibration.is_calibrated:
+            self.calibration_window.restore_calibration(self.piecewise_calibration)
 
         self.calibration_window.setGeometry(self._saved_geometry)
         self.calibration_window.show()
@@ -296,6 +328,10 @@ class LSMDApplication:
         if self.settings_window:
             self.settings_window.setGeometry(self._saved_geometry)
             self.settings_window.show()
+
+            #Update 5-point calibration date if available
+            if self.piecewise_calibration.is_calibrated and self.piecewise_calibration.calibration_date:
+                self.settings_window.update_five_point_status(self.piecewise_calibration.calibration_date)
 
     #Navigate to dashboard from calibration (skips settings)
     def on_navigate_to_dashboard_from_calibration(self):
@@ -480,6 +516,47 @@ class LSMDApplication:
                 json.dump(config, f, indent=4)
         except Exception as e:
             print(f"Failed to save config: {e}")
+
+    #5-point calibration complete, save to disk and apply to dashboard
+    def on_five_point_calibration_complete(self, piecewise_cal):
+        self.piecewise_calibration = piecewise_cal
+        self.piecewise_calibration.save_to_file(CAL_FILE)
+        print(f"Calibration saved to {CAL_FILE}")
+
+        #Apply to dashboard immediately
+        if self.data_acquisition_window:
+            self.data_acquisition_window.piecewise_cal = piecewise_cal
+
+        #Update settings window date display if open
+        if self.settings_window and self.piecewise_calibration.calibration_date:
+            self.settings_window.update_five_point_status(self.piecewise_calibration.calibration_date)
+    
+    #Resets timer on activity
+    def eventFilter(self, obj, event):
+        if self.auto_turn_off_enabled:
+            if event.type() in (QEvent.Type.MouseMove, QEvent.Type.MouseButtonPress,
+                                QEvent.Type.KeyPress, QEvent.Type.Wheel):
+                self.inactivity_timer.start()  #restart countdown
+        return False  #dont consume event
+    
+    #Auto turn off changed
+    def on_auto_turn_off_changed(self, enabled, minutes):
+        self.auto_turn_off_enabled = enabled
+        if enabled:
+            self.inactivity_timer.setInterval(minutes * 60 * 1000)
+            self.inactivity_timer.start()
+            self.app.installEventFilter(self)
+            print(f"Auto turn-off enabled — {minutes} minute(s)")
+        else:
+            self.inactivity_timer.stop()
+            self.app.removeEventFilter(self)
+            print("Auto turn-off disabled")
+
+    #Timeout handler, disconnect device and quit application
+    def on_inactivity_timeout(self):
+        print("Inactivity timeout — closing application")
+        self.on_disconnect_request()
+        self.app.quit()
     
 #Main app
 def main():

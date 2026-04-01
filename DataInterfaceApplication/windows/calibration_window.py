@@ -23,6 +23,7 @@ class CalibrationWindow(QWidget):
     send_data = pyqtSignal(str)
     zero_calibration_complete = pyqtSignal(float)
     zero_status_updated = pyqtSignal(float, bool)
+    five_point_calibration_complete = pyqtSignal(object)  #emits PiecewiseLinearCalibration instance
  
     def __init__(self, connection_type="usb", device_address=None, port_name=None, baud_rate=None, sample_rate=1200.0):
         super().__init__()
@@ -708,7 +709,7 @@ class CalibrationWindow(QWidget):
 
         layout.addWidget(self.results_card)
 
-    #Create a single result box — point title, interpolated value, error
+    #Create a single result box — point title, newton value, ADC reading
     def create_result_box(self, index):
         box = QFrame()
         box.setStyleSheet("""
@@ -724,26 +725,19 @@ class CalibrationWindow(QWidget):
         box_layout.setSpacing(4)
 
         #Point title
-        title_label = QLabel(f"{index * 25}% Point")
+        title_label = QLabel(f"Point {index + 1}")
         title_label.setStyleSheet("color: #888888; font-size: 11px; background: transparent; border: none;")
         box_layout.addWidget(title_label)
 
-        #Interpolated value — bold, placeholder for now
+        #Newton value entered by user
         value_label = QLabel("—")
         value_label.setStyleSheet("color: #1A1A1A; font-size: 16px; font-weight: 700; background: transparent; border: none;")
         box_layout.addWidget(value_label)
 
-        #Error from real value — green
-        error_label = QLabel("")
-        error_label.setStyleSheet("color: #4CAF50; font-size: 11px; background: transparent; border: none;")
-        box_layout.addWidget(error_label)
-
-        #Store references
         result_data = {
             'frame': box,
             'title_label': title_label,
             'value_label': value_label,
-            'error_label': error_label
         }
         self.result_boxes.append(result_data)
 
@@ -1179,27 +1173,20 @@ class CalibrationWindow(QWidget):
             self.piecewise_cal.load_points(self.five_point_cal.get_calibration_points())
 
             self.populate_results_card()
+            self.five_point_calibration_complete.emit(self.piecewise_cal)
 
-    #Populate the calibration results card with captured data and placeholder interpolation
+    #Populate the calibration results card with captured newton and ADC values
     def populate_results_card(self):
-        points = self.five_point_cal.get_calibration_points()
-        results = self.piecewise_cal.get_interpolated_results(points)
+        points = self.piecewise_cal.get_display_points()
 
-        for i, result in enumerate(results):
+        for i, point in enumerate(points):
             box = self.result_boxes[i]
-
-            interpolated = result['newton_interpolated']
-            error = result['error_absolute']
-            error_percent = result['error_percent']
-
-            box['value_label'].setText(f"{interpolated:.2f}N")
-
-            if result['newton_entered'] != 0:
-                box['error_label'].setText(f"Error: ±{error:.2f}N ({error_percent:.1f}%)")
-            else:
-                if error == 0:
-                    box['error_label'].setText(f"Error: ±{error:.2f}N (0%)")
-                else:
-                    box['error_label'].setText(f"Error: ±{error:.2f}N")
+            box['value_label'].setText(f"{point['newton_entered']:.1f} N")
 
         self.results_card.setVisible(True)
+
+    #Restore a previously saved calibration — called by main.py on window creation if JSON exists
+    #Populates the results card so calibration is viewable without re-running
+    def restore_calibration(self, piecewise_cal):
+        self.piecewise_cal = piecewise_cal
+        self.populate_results_card()

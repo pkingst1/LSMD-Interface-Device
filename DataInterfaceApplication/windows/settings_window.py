@@ -20,6 +20,7 @@ class SettingsWindow(QWidget):
     filter_settings_changed = pyqtSignal()
     navigate_to_calibration = pyqtSignal()
     auto_reconnect_changed = pyqtSignal(bool)
+    auto_turn_off_changed = pyqtSignal(bool, int)  #enabled, minutes
     
 
     def __init__(self, connection_type, device_address=None, port_name=None, baud_rate=None):
@@ -742,12 +743,12 @@ class SettingsWindow(QWidget):
         five_status_layout = QHBoxLayout()
         five_status_layout.setContentsMargins(0, 0, 0, 0)
         five_status_layout.setSpacing(4)
-        five_dot = QLabel("●")
-        five_dot.setStyleSheet("color: #4CAF50; font-size: 10px; background: transparent; border: none;")
-        five_text = QLabel("Day - Month - Year last calibration")
-        five_text.setStyleSheet("color: #666666; font-size: 11px; background: transparent; border: none;")
-        five_status_layout.addWidget(five_dot)
-        five_status_layout.addWidget(five_text)
+        self.five_dot = QLabel("●")
+        self.five_dot.setStyleSheet("color: #DAA520; font-size: 10px; background: transparent; border: none;")
+        self.five_text = QLabel("Not calibrated")
+        self.five_text.setStyleSheet("color: #666666; font-size: 11px; background: transparent; border: none;")
+        five_status_layout.addWidget(self.five_dot)
+        five_status_layout.addWidget(self.five_text)
         five_status_layout.addStretch(1)
         five_container.addLayout(five_status_layout)
         card_layout.addLayout(five_container)
@@ -918,6 +919,8 @@ class SettingsWindow(QWidget):
         self.inactivity_input.setVisible(False)
         card_layout.addWidget(self.inactivity_input)
 
+        self.inactivity_input.textChanged.connect(self._on_inactivity_input_changed)
+
         #Toggle controls inactivity input visibility
         self.auto_off_toggle.toggled.connect(self.on_auto_off_toggled)
 
@@ -965,6 +968,12 @@ class SettingsWindow(QWidget):
     def on_auto_off_toggled(self, checked):
         self.inactivity_label.setVisible(checked)
         self.inactivity_input.setVisible(checked)
+        #Emit current state and minutes value to main.py
+        try:
+            minutes = int(self.inactivity_input.text().strip())
+        except ValueError:
+            minutes = 5
+        self.auto_turn_off_changed.emit(checked, minutes)
 
     #On calibration button click, navigate to calibration window
     def on_calibration_clicked(self):
@@ -978,3 +987,26 @@ class SettingsWindow(QWidget):
         else:
             self.zero_dot.setStyleSheet("color: #DAA520; font-size: 10px; background: transparent; border: none;")
             self.zero_text.setText("Every session placeholder")
+
+    #Update 5-point calibration date display
+    def update_five_point_status(self, calibration_date):
+        from datetime import date
+        days_elapsed = (date.today() - calibration_date).days
+        date_str = calibration_date.isoformat()  #eg "2026-04-01"
+
+        self.five_text.setText(f"Last calibration: {date_str}")
+
+        #Red if over 180 days, green otherwise
+        if days_elapsed > 180:
+            self.five_dot.setStyleSheet("color: #DC3545; font-size: 10px; background: transparent; border: none;")
+        else:
+            self.five_dot.setStyleSheet("color: #4CAF50; font-size: 10px; background: transparent; border: none;")
+
+    #Inactivity input text changed handler
+    def _on_inactivity_input_changed(self):
+        if self.auto_off_toggle.isChecked():
+            try:
+                minutes = int(self.inactivity_input.text().strip())
+            except ValueError:
+                return
+            self.auto_turn_off_changed.emit(True, minutes)
