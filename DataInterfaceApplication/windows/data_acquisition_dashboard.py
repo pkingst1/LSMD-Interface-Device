@@ -730,7 +730,7 @@ class DataAcquisitionDashboard(QWidget):
         df["Rate of Torque Dev (N·m/s)"]   = rate_col
 
         #Write dataframe to CSV
-        df.to_csv(file_path, index=False)
+        df.to_csv(file_path, index=False, encoding='utf-8-sig')
         print(f"Data exported to {file_path}")
     
     #Update button styles based on acquisition state
