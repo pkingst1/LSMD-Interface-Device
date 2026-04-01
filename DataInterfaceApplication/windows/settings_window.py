@@ -742,12 +742,12 @@ class SettingsWindow(QWidget):
         five_status_layout = QHBoxLayout()
         five_status_layout.setContentsMargins(0, 0, 0, 0)
         five_status_layout.setSpacing(4)
-        five_dot = QLabel("●")
-        five_dot.setStyleSheet("color: #4CAF50; font-size: 10px; background: transparent; border: none;")
-        five_text = QLabel("Day - Month - Year last calibration")
-        five_text.setStyleSheet("color: #666666; font-size: 11px; background: transparent; border: none;")
-        five_status_layout.addWidget(five_dot)
-        five_status_layout.addWidget(five_text)
+        self.five_dot = QLabel("●")
+        self.five_dot.setStyleSheet("color: #DAA520; font-size: 10px; background: transparent; border: none;")
+        self.five_text = QLabel("Not calibrated")
+        self.five_text.setStyleSheet("color: #666666; font-size: 11px; background: transparent; border: none;")
+        five_status_layout.addWidget(self.five_dot)
+        five_status_layout.addWidget(self.five_text)
         five_status_layout.addStretch(1)
         five_container.addLayout(five_status_layout)
         card_layout.addLayout(five_container)
@@ -978,3 +978,17 @@ class SettingsWindow(QWidget):
         else:
             self.zero_dot.setStyleSheet("color: #DAA520; font-size: 10px; background: transparent; border: none;")
             self.zero_text.setText("Every session placeholder")
+
+    #Update 5-point calibration date display
+    def update_five_point_status(self, calibration_date):
+        from datetime import date
+        days_elapsed = (date.today() - calibration_date).days
+        date_str = calibration_date.isoformat()  #eg "2026-04-01"
+
+        self.five_text.setText(f"Last calibration: {date_str}")
+
+        #Red if over 180 days, green otherwise
+        if days_elapsed > 180:
+            self.five_dot.setStyleSheet("color: #DC3545; font-size: 10px; background: transparent; border: none;")
+        else:
+            self.five_dot.setStyleSheet("color: #4CAF50; font-size: 10px; background: transparent; border: none;")

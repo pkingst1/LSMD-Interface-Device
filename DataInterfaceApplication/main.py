@@ -19,6 +19,10 @@ from windows.settings_window import SettingsWindow
 from utils.bluetooth_manager import BluetoothWorker
 from utils.usb_manager import USBWorker
 from utils.zero_calibration import ZeroCalibration
+from utils.piecewise_linear_calibration import PiecewiseLinearCalibration
+
+#Path to calibration file
+CAL_FILE = os.path.join(os.path.dirname(__file__), "calibration.json")
 
 #Main Application Controller
 class LSMDApplication:
@@ -48,6 +52,14 @@ class LSMDApplication:
 
         #Zero calibration for force measurements
         self.zero_calibration = ZeroCalibration()
+
+        #Piecewise linear calibration - saved across sessions
+        self.piecewise_calibration = PiecewiseLinearCalibration()
+        loaded = self.piecewise_calibration.load_from_file(CAL_FILE)
+        if loaded:
+            print(f"Calibration loaded — {len(self.piecewise_calibration.lookup_table)} points")
+        else:
+            print("No saved calibration — 5-point calibration required before measurements")
 
         #Track connection type
         self.connection_type = None
@@ -199,6 +211,9 @@ class LSMDApplication:
         self.data_acquisition_window.disconnect_request.connect(self.on_disconnect_request)
         #send
         self.data_acquisition_window.send_data.connect(self.on_send_data)
+        #Apply saved piecewise calibration if available
+        if self.piecewise_calibration.is_calibrated:
+            self.data_acquisition_window.piecewise_cal = self.piecewise_calibration
 
         self.data_acquisition_window.show()
         self.data_acquisition_window.setGeometry(self._saved_geometry) #Restore size
@@ -227,6 +242,10 @@ class LSMDApplication:
 
         self.settings_window.setGeometry(self._saved_geometry) #Restore size
         self.settings_window.show()
+
+        #Update 5-point calibration date if available
+        if self.piecewise_calibration.is_calibrated and self.piecewise_calibration.calibration_date:
+            self.settings_window.update_five_point_status(self.piecewise_calibration.calibration_date)
     
     #Filter settings changed
     def on_filter_settings_changed(self):
@@ -283,6 +302,11 @@ class LSMDApplication:
             self.calibration_window.send_data.connect(self.on_send_data)
             self.calibration_window.zero_calibration_complete.connect(self.on_zero_calibration_complete)
             self.calibration_window.zero_status_updated.connect(self.on_zero_status_updated)
+            self.calibration_window.five_point_calibration_complete.connect(self.on_five_point_calibration_complete)
+        
+        #Restore saved calibration into window if available
+        if self.piecewise_calibration.is_calibrated:
+            self.calibration_window.restore_calibration(self.piecewise_calibration)
 
         self.calibration_window.setGeometry(self._saved_geometry)
         self.calibration_window.show()
@@ -296,6 +320,10 @@ class LSMDApplication:
         if self.settings_window:
             self.settings_window.setGeometry(self._saved_geometry)
             self.settings_window.show()
+
+            #Update 5-point calibration date if available
+            if self.piecewise_calibration.is_calibrated and self.piecewise_calibration.calibration_date:
+                self.settings_window.update_five_point_status(self.piecewise_calibration.calibration_date)
 
     #Navigate to dashboard from calibration (skips settings)
     def on_navigate_to_dashboard_from_calibration(self):
@@ -480,6 +508,20 @@ class LSMDApplication:
                 json.dump(config, f, indent=4)
         except Exception as e:
             print(f"Failed to save config: {e}")
+
+    #5-point calibration complete, save to disk and apply to dashboard
+    def on_five_point_calibration_complete(self, piecewise_cal):
+        self.piecewise_calibration = piecewise_cal
+        self.piecewise_calibration.save_to_file(CAL_FILE)
+        print(f"Calibration saved to {CAL_FILE}")
+
+        #Apply to dashboard immediately
+        if self.data_acquisition_window:
+            self.data_acquisition_window.piecewise_cal = piecewise_cal
+
+        #Update settings window date display if open
+        if self.settings_window and self.piecewise_calibration.calibration_date:
+            self.settings_window.update_five_point_status(self.piecewise_calibration.calibration_date)
     
 #Main app
 def main():

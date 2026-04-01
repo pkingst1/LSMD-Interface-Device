@@ -57,6 +57,7 @@ class DataAcquisitionDashboard(QWidget):
         self.rfd = None        #rate of force development for export (N/s), None if not calculated
 
         self.zero_offset = 0.0
+        self.piecewise_cal = None
         
         self.init_ui()
 
@@ -831,9 +832,11 @@ class DataAcquisitionDashboard(QWidget):
                 #Calculate time from sample count
                 time_value = self.data_point_count / self.sample_rate
 
-                #Apply zero calibration offset
-                #0.6 is a calculated calibration factor for the samples
-                corrected_value = (force_value * 0.6) - self.zero_offset
+                #Apply piecewise calibration if available, otherwise pass raw ADC value
+                if self.piecewise_cal and self.piecewise_cal.is_calibrated:
+                    corrected_value = self.piecewise_cal.adc_to_newtons(force_value) - self.zero_offset
+                else:
+                    corrected_value = force_value - self.zero_offset
 
                 self.time_data.append(time_value)
                 self.force_data.append(corrected_value)
