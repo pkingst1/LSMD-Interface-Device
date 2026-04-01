@@ -99,8 +99,6 @@ class BluetoothManager(QObject):
 
                 print(f"Negotiated MTU: {self.client.mtu_size}") #prints negotiated mtu size
 
-                await asyncio.sleep(1.0) #wait for 1 second for security handshake
-
                 await self._discover_uuids()        #discover uuids
 
                 self.connected.emit(device_name)    #signal device connected
