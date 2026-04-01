@@ -503,8 +503,7 @@ class DataAcquisitionDashboard(QWidget):
         self.plot_widget.getAxis('bottom').setStyle(tickTextOffset=5)
         self.plot_widget.getAxis('left').setStyle(tickTextOffset=5)
 
-        #Custom tick labels for units
-        self.plot_widget.getAxis('left').tickStrings = lambda values, scale, spacing: [f"{v:.1f} N·m" for v in values]
+        self.plot_widget.getAxis('left').tickStrings = lambda values, scale, spacing: [f"{v:.1f}" for v in values]
         
         self.plot_widget.setLimits(xMin=0)
         
