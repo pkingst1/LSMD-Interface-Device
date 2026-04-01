@@ -378,14 +378,14 @@ void loop() {
   Serial.print(F(" SafA:0x")); Serial.print(safA, HEX);
   Serial.print(F(" SafB:0x")); Serial.println(safB, HEX);
 
-  Serial.print(F("VC1:")); Serial.print(vc1);
-  Serial.print(F(" VC2:")); Serial.print(vc2);
-  Serial.print(F(" VC3:")); Serial.print(vc3);
-  Serial.print(F(" VC4:")); Serial.println(vc4);
+  Serial.print(F("VC1:")); Serial.print(vc1);Serial.print(F("mV"));
+  Serial.print(F(" VC2:")); Serial.print(vc2);Serial.print(F("mV\n"));
+  Serial.print(F(" VC3:")); Serial.print(vc3);Serial.print(F("mV"));
+  Serial.print(F(" VC4:")); Serial.println(vc4);Serial.print(F("mV\n"));
 
-  Serial.print(F("Stack:")); Serial.print(stackV);
+  Serial.print(F("Stack:")); Serial.print(stackV);Serial.print(F("mV"));
   if (fStat & 0x04) {
-    Serial.print(F(" Pack:")); Serial.println(packV);
+    Serial.print(F(" Pack:")); Serial.println(packV);Serial.print(F("mV"));
   } else {
     Serial.println(F(" Pack:0(open)"));
   }
