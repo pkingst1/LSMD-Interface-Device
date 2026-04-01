@@ -952,7 +952,7 @@ class SettingsWindow(QWidget):
         auto_reconnect_text_layout.addWidget(auto_reconnect_sub)
  
         self.auto_reconnect_toggle = ToggleSwitch()
-        self.auto_reconnect_toggle.setChecked(False) #off by default
+        self.auto_reconnect_toggle.setChecked(True) #on by default
         self.auto_reconnect_toggle.toggled.connect(self.auto_reconnect_changed.emit)
  
         auto_reconnect_layout.addLayout(auto_reconnect_text_layout)
