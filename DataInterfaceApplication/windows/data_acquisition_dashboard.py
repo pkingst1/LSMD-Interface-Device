@@ -52,11 +52,13 @@ class DataAcquisitionDashboard(QWidget):
         self.rate_start_line = None
         self.rate_end_line = None
 
-        self.peak_force = 0.0  #peak force value for export (N)
-        self.rfd = None        #rate of force development for export (N/s), None if not calculated
+        self.peak_torque = 0.0  #peak torque value for export (N·m)
+        self.rtd = None        #rate of torque development for export (N·m/s), None if not calculated
 
         self.zero_offset = 0.0
         self.piecewise_cal = None
+
+        self.settings_window = None  #set for limb length access
         
         self.init_ui()
 
@@ -396,7 +398,7 @@ class DataAcquisitionDashboard(QWidget):
 
         icon_label = QLabel("↑")
         icon_label.setStyleSheet("color: #1A1A1A; font-size: 14px; background: transparent; border: none;")
-        title_label = QLabel("Peak Force")
+        title_label = QLabel("Peak Torque")
         title_label.setStyleSheet("color: #1A1A1A; font-size: 14px; font-weight: 600; background: transparent; border: none;")
 
         header_layout.addWidget(icon_label)
@@ -407,12 +409,12 @@ class DataAcquisitionDashboard(QWidget):
 
 
         #Peak value display
-        self.peak_value_label = QLabel("0.0 N")
+        self.peak_value_label = QLabel("0.0 N·m")
         self.peak_value_label.setStyleSheet("color: #1A1A1A; font-size: 28px; font-weight: 600; background: transparent; border: none;")
         card_layout.addWidget(self.peak_value_label)
 
         #Subtitle
-        subtitle_label = QLabel("Maximum force detected")
+        subtitle_label = QLabel("Maximum torque detected")
         subtitle_label.setStyleSheet("color: #666666; font-size: 12px; background: transparent; border: none;")
         card_layout.addWidget(subtitle_label)
 
@@ -476,10 +478,10 @@ class DataAcquisitionDashboard(QWidget):
         header_layout = QHBoxLayout()
         header_layout.setSpacing(8)
         
-        title_label = QLabel("Force vs Time")
+        title_label = QLabel("Torque vs Time")
         title_label.setStyleSheet("color: #1A1A1A; font-size: 14px; font-weight: 600; background: transparent; border: none;")
         
-        subtitle_label = QLabel("Real-time force measurement display")
+        subtitle_label = QLabel("Real-time torque measurement display")
         subtitle_label.setStyleSheet("color: #666666; font-size: 12px; background: transparent; border: none;")
         
         header_layout.addWidget(title_label)
@@ -501,8 +503,7 @@ class DataAcquisitionDashboard(QWidget):
         self.plot_widget.getAxis('bottom').setStyle(tickTextOffset=5)
         self.plot_widget.getAxis('left').setStyle(tickTextOffset=5)
 
-        #Custom tick labels for units
-        self.plot_widget.getAxis('left').tickStrings = lambda values, scale, spacing: [f"{v:.0f} N" for v in values]
+        self.plot_widget.getAxis('left').tickStrings = lambda values, scale, spacing: [f"{v:.1f}" for v in values]
         
         self.plot_widget.setLimits(xMin=0)
         
@@ -515,7 +516,7 @@ class DataAcquisitionDashboard(QWidget):
 
         #Set initial ranges
         #self.plot_widget.setXRange(0, 10, padding=0)
-        self.plot_widget.setYRange(0, 1000, padding=0)
+        self.plot_widget.setYRange(0, 500, padding=0)
         QTimer.singleShot(0, lambda: self.update_time_ticks(10))    #Update time ticks after initial layout
         
         canvas_widget = QWidget()
@@ -609,7 +610,7 @@ class DataAcquisitionDashboard(QWidget):
             self.acquisition_start_time = None
 
             #Reset peak value
-            self.peak_value_label.setText("0.0 N")
+            self.peak_value_label.setText("0.0 N·m")
 
             #Disable and clear rate analysis
             self.rate_start_input.setEnabled(False)
@@ -677,10 +678,10 @@ class DataAcquisitionDashboard(QWidget):
             self.data_point_count = 0
             self.acquisition_start_time = None
             self.x_axis_max = 1
-            self.peak_value_label.setText("0.0 N")
+            self.peak_value_label.setText("0.0 N·m")
             self.line.setData([], [])
             #self.plot_widget.setXRange(0, 10, padding=0)
-            self.plot_widget.setYRange(0, 1000)
+            self.plot_widget.setYRange(0, 500)
             self.update_time_ticks(10)
             self.stats_data_points.setText("0")
             self.stats_duration.setText("0.0 s")
@@ -714,18 +715,19 @@ class DataAcquisitionDashboard(QWidget):
         if not file_path:
             return
         
-        #Dataframe with time and force columns
+        limb_m = self.get_limb_length_m()
+        #DataFrame with time and torque values
         df = pd.DataFrame({
             "Time (s)": list(self.time_data),
-            "Force (N)": [round(f, 2) for f in self.force_data]}
+            "Torque (N·m)": [round(f * limb_m, 2) for f in self.force_data]}
         )
 
-        #Peak force and RFD written to row 1 only — remaining rows left blank
-        peak_col = [f"{self.peak_force:.1f}"] + [""] * (len(self.time_data) - 1)
-        rate_col  = [f"{self.rfd:.2f}" if self.rfd is not None else "—"] + [""] * (len(self.time_data) - 1)
+        #Peak torque and RTD written to row 1 only — remaining rows left blank
+        peak_col = [f"{self.peak_torque:.2f}"] + [""] * (len(self.time_data) - 1)
+        rate_col  = [f"{self.rtd:.2f}" if self.rtd is not None else "—"] + [""] * (len(self.time_data) - 1)
 
-        df["Peak Force (N)"]           = peak_col
-        df["Rate of Force Dev (N/s)"]  = rate_col
+        df["Peak Torque (N·m)"]            = peak_col
+        df["Rate of Torque Dev (N·m/s)"]   = rate_col
 
         #Write dataframe to CSV
         df.to_csv(file_path, index=False)
@@ -858,7 +860,9 @@ class DataAcquisitionDashboard(QWidget):
         
     def update_plot(self):
         if len(self.time_data) > 0:
-            self.line.setData(list(self.time_data), list(self.force_data))
+            limb_m = self.get_limb_length_m()
+            torque_data = [f * limb_m for f in self.force_data]
+            self.line.setData(list(self.time_data), torque_data)
 
             #Auto-scale x-axis as data acquired, max 10 seconds
             max_time = max(self.time_data)
@@ -869,15 +873,15 @@ class DataAcquisitionDashboard(QWidget):
 
 
             #Auto-scale y-axis
-            if len(self.force_data) > 0:
-                min_force = min(self.force_data)
-                max_force = max(self.force_data)
-                margin = (max_force - min_force) * 0.1 if max_force > min_force else 100
-                self.plot_widget.setYRange(max(0, min_force - margin), max_force + margin)
+            if len(torque_data) > 0:
+                min_torque = min(torque_data)
+                max_torque = max(torque_data)
+                margin = (max_torque - min_torque) * 0.1 if max_torque > min_torque else 10
+                self.plot_widget.setYRange(max(0, min_torque - margin), max_torque + margin)
 
-                #Update peak value
-                self.peak_force = max_force
-                self.peak_value_label.setText(f"{max_force:.1f} N")
+                #Update peak torque value
+                self.peak_torque = max_torque
+                self.peak_value_label.setText(f"{max_torque:.2f} N·m")
 
             self.stats_data_points.setText(str(self.data_point_count))
             self.stats_duration.setText(f"{max_time:.1f} s")
@@ -947,7 +951,7 @@ class DataAcquisitionDashboard(QWidget):
 
         icon_label = QLabel("↗")
         icon_label.setStyleSheet("color: #1A1A1A; font-size: 14px; background: transparent; border: none;")
-        title_label = QLabel("Force Rate Analysis")
+        title_label = QLabel("Torque Rate Analysis")
         title_label.setStyleSheet("color: #1A1A1A; font-size: 14px; font-weight: 600; background: transparent; border: none;")
 
         header_layout.addWidget(icon_label)
@@ -1018,7 +1022,7 @@ class DataAcquisitionDashboard(QWidget):
         card_layout.addLayout(inputs_layout)
 
         #Rate result
-        rate_label = QLabel("Rate of Force Development")
+        rate_label = QLabel("Rate of Torque Development")
         rate_label.setStyleSheet("color: #666666; font-size: 12px; background: transparent; border: none;")
         card_layout.addWidget(rate_label)
 
@@ -1071,7 +1075,7 @@ class DataAcquisitionDashboard(QWidget):
 
         #Reject if end is before start
         if end_time <= start_time:
-            self.rfd = None
+            self.rtd = None
             self.rate_value_label.setText("—")
             return
 
@@ -1084,22 +1088,23 @@ class DataAcquisitionDashboard(QWidget):
 
         #cannot be same
         if start_index == end_index:
-            self.rfd = None
+            self.rtd = None
             self.rate_value_label.setText("—")
             return
 
-        delta_force = force_list[end_index] - force_list[start_index]
+        limb_m = self.get_limb_length_m()
+        delta_torque = (force_list[end_index] - force_list[start_index]) * limb_m
         delta_time = time_list[end_index] - time_list[start_index]
 
         #cannot be zero
         if delta_time == 0:
-            self.rfd = None
+            self.rtd = None
             self.rate_value_label.setText("—")
             return
 
-        rate = delta_force / delta_time
-        self.rfd = rate  #store for export
-        self.rate_value_label.setText(f"{rate:.2f} N/s")
+        rate = delta_torque / delta_time
+        self.rtd = rate  #store for export
+        self.rate_value_label.setText(f"{rate:.2f} N·m/s")
 
     #Draw rate lines on plot
     def draw_rate_lines(self, start_time, end_time):
@@ -1123,4 +1128,11 @@ class DataAcquisitionDashboard(QWidget):
             self.plot_widget.removeItem(self.rate_end_line)
             self.rate_end_line = None
 
-
+    #Read limb length from settings, convert to meters, 0.5 m default
+    def get_limb_length_m(self):
+        if self.settings_window is None:
+            return 0.50
+        try:
+            return float(self.settings_window.limb_length_input.text().strip()) / 100.0
+        except (ValueError, AttributeError):
+            return 0.50

@@ -202,6 +202,10 @@ class LSMDApplication(QObject):
             self.data_acquisition_window.switch_view.connect(self.on_switch_view)
             self.data_acquisition_window.navigate_to_settings.connect(self.on_navigate_to_settings)
             self.data_acquisition_window.clear_data_selected.connect(self.on_clear_data_filters)
+
+            #Pass settings for limb length access
+            if self.settings_window:
+                self.data_acquisition_window.settings_window = self.settings_window
         
         #Debug view
         else:
@@ -247,6 +251,10 @@ class LSMDApplication(QObject):
             self.settings_window.navigate_to_calibration.connect(self.on_navigate_to_calibration)
             self.settings_window.auto_reconnect_changed.connect(self.on_auto_reconnect_changed)
             self.settings_window.auto_turn_off_changed.connect(self.on_auto_turn_off_changed)
+
+            #Ensure dashboard has access to limb length
+            if self.data_acquisition_window:
+                self.data_acquisition_window.settings_window = self.settings_window
 
         self.settings_window.setGeometry(self._saved_geometry) #Restore size
         self.settings_window.show()
