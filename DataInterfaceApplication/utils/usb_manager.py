@@ -31,7 +31,7 @@ class USBManager(QObject):
 
         #Serial settings
         self.baud_rate = 115200 #default rate, must match PIC rate
-        self.timeout = 1
+        self.timeout = 0.05     #50ms timeout
 
     #Scan for USB devices
     #Returns list of devices(description, port name)
@@ -230,27 +230,23 @@ class USBWorker(QThread):
             self.error.emit(f"Error in USB worker: {str(e)}")
             self.running = False    #stop program
 
-    #Read loop while connected
-    #read data immediately, emits signal in batches
+    #Blocking read loop while connected, blocks until data is available or timeout elapse
+    #no polling, no msleep
     def _read_loop(self):
+        CHUNK = 256  # read up to 256 bytes at a time
+
         while self.running and self.manager.is_connected:
             try:
-                waiting = self.manager.serial_port.in_waiting    #check if data available
-                #if data available, read it
-                if waiting > 0:
-                    #read data
-                    data = self.manager.serial_port.read(waiting)
-                    self.data_received.emit(data)    #data received
-                else:
-                    self.msleep(1)    #small delay to avoid high CPU usage
-        
-            #if error only when unintentional stop
+                data = self.manager.serial_port.read(CHUNK)
+                if data:
+                    self.data_received.emit(data)
+                # else: timeout elapsed, loop re-checks self.running
+
             except Exception as e:
                 if self.running:
                     self.error.emit(f"Error in read loop: {str(e)}")
-                break    #stop loop
-        
-        #if loop ended, but supposed to be running, try reconnect
+                break
+
         if self.running and self.auto_reconnect:
             self.attempt_reconnect()
     
