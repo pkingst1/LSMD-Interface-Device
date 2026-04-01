@@ -608,6 +608,7 @@ class DataAcquisitionDashboard(QWidget):
             self.raw_force_data.clear()
             self.data_point_count = 0
             self.acquisition_start_time = None
+            self._transient_count = 0  #hardcode remove transients at start of sample
 
             #Reset peak value
             self.peak_value_label.setText("0.0 N·m")
@@ -828,6 +829,11 @@ class DataAcquisitionDashboard(QWidget):
 
                 #Reject values outside of expected 10 bit range (0-1023)
                 if force_value < 0 or force_value > 1023:
+                    continue
+
+                #Discard first 25 samples to remove BLE connection transient
+                if self._transient_count < 25:
+                    self._transient_count += 1
                     continue
 
                 #Calculate time from sample count
