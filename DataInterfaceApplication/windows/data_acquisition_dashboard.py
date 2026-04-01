@@ -7,8 +7,7 @@ Allows for switching with testing data acquisition window
 """
 
 from PyQt6.QtWidgets import (QWidget, QLabel, QPushButton, QVBoxLayout,
-                             QHBoxLayout, QTextEdit, QLineEdit, QScrollArea, QFrame, QGridLayout,
-                             QFileDialog)
+                             QHBoxLayout,  QLineEdit, QFrame, QFileDialog)
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont
 import pyqtgraph as pg

@@ -9,6 +9,7 @@ import os
 
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import (QFont, QPalette, QColor)
+from PyQt6.QtCore import QTimer, QEvent, QObject
 
 from windows.connection_window import ConnectionWindow
 from windows.device_selection import DeviceSelection
@@ -25,8 +26,9 @@ from utils.piecewise_linear_calibration import PiecewiseLinearCalibration
 CAL_FILE = os.path.join(os.path.dirname(__file__), "calibration.json")
 
 #Main Application Controller
-class LSMDApplication:
+class LSMDApplication(QObject):
     def __init__(self):
+        super().__init__()
         self.app = QApplication(sys.argv)
         self.setup_application()
 
@@ -52,6 +54,12 @@ class LSMDApplication:
 
         #Zero calibration for force measurements
         self.zero_calibration = ZeroCalibration()
+
+        #Inactivity timer for automatic turn-off
+        self.inactivity_timer = QTimer()
+        self.inactivity_timer.setSingleShot(True)
+        self.inactivity_timer.timeout.connect(self.on_inactivity_timeout)
+        self.auto_turn_off_enabled = False
 
         #Piecewise linear calibration - saved across sessions
         self.piecewise_calibration = PiecewiseLinearCalibration()
@@ -238,7 +246,7 @@ class LSMDApplication:
             self.settings_window.filter_settings_changed.connect(self.on_filter_settings_changed)
             self.settings_window.navigate_to_calibration.connect(self.on_navigate_to_calibration)
             self.settings_window.auto_reconnect_changed.connect(self.on_auto_reconnect_changed)
-
+            self.settings_window.auto_turn_off_changed.connect(self.on_auto_turn_off_changed)
 
         self.settings_window.setGeometry(self._saved_geometry) #Restore size
         self.settings_window.show()
@@ -522,6 +530,33 @@ class LSMDApplication:
         #Update settings window date display if open
         if self.settings_window and self.piecewise_calibration.calibration_date:
             self.settings_window.update_five_point_status(self.piecewise_calibration.calibration_date)
+    
+    #Resets timer on activity
+    def eventFilter(self, obj, event):
+        if self.auto_turn_off_enabled:
+            if event.type() in (QEvent.Type.MouseMove, QEvent.Type.MouseButtonPress,
+                                QEvent.Type.KeyPress, QEvent.Type.Wheel):
+                self.inactivity_timer.start()  #restart countdown
+        return False  #dont consume event
+    
+    #Auto turn off changed
+    def on_auto_turn_off_changed(self, enabled, minutes):
+        self.auto_turn_off_enabled = enabled
+        if enabled:
+            self.inactivity_timer.setInterval(minutes * 60 * 1000)
+            self.inactivity_timer.start()
+            self.app.installEventFilter(self)
+            print(f"Auto turn-off enabled — {minutes} minute(s)")
+        else:
+            self.inactivity_timer.stop()
+            self.app.removeEventFilter(self)
+            print("Auto turn-off disabled")
+
+    #Timeout handler, disconnect device and quit application
+    def on_inactivity_timeout(self):
+        print("Inactivity timeout — closing application")
+        self.on_disconnect_request()
+        self.app.quit()
     
 #Main app
 def main():

@@ -20,6 +20,7 @@ class SettingsWindow(QWidget):
     filter_settings_changed = pyqtSignal()
     navigate_to_calibration = pyqtSignal()
     auto_reconnect_changed = pyqtSignal(bool)
+    auto_turn_off_changed = pyqtSignal(bool, int)  #enabled, minutes
     
 
     def __init__(self, connection_type, device_address=None, port_name=None, baud_rate=None):
@@ -918,6 +919,8 @@ class SettingsWindow(QWidget):
         self.inactivity_input.setVisible(False)
         card_layout.addWidget(self.inactivity_input)
 
+        self.inactivity_input.textChanged.connect(self._on_inactivity_input_changed)
+
         #Toggle controls inactivity input visibility
         self.auto_off_toggle.toggled.connect(self.on_auto_off_toggled)
 
@@ -965,6 +968,12 @@ class SettingsWindow(QWidget):
     def on_auto_off_toggled(self, checked):
         self.inactivity_label.setVisible(checked)
         self.inactivity_input.setVisible(checked)
+        #Emit current state and minutes value to main.py
+        try:
+            minutes = int(self.inactivity_input.text().strip())
+        except ValueError:
+            minutes = 5
+        self.auto_turn_off_changed.emit(checked, minutes)
 
     #On calibration button click, navigate to calibration window
     def on_calibration_clicked(self):
@@ -992,3 +1001,12 @@ class SettingsWindow(QWidget):
             self.five_dot.setStyleSheet("color: #DC3545; font-size: 10px; background: transparent; border: none;")
         else:
             self.five_dot.setStyleSheet("color: #4CAF50; font-size: 10px; background: transparent; border: none;")
+
+    #Inactivity input text changed handler
+    def _on_inactivity_input_changed(self):
+        if self.auto_off_toggle.isChecked():
+            try:
+                minutes = int(self.inactivity_input.text().strip())
+            except ValueError:
+                return
+            self.auto_turn_off_changed.emit(True, minutes)
