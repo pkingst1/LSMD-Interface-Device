@@ -1,0 +1,79 @@
+configVersion: 1.0.0
+coreVersion: 5.8.4
+spaHostVersion: 1.2.1
+device: PIC32MX274F256B
+deviceLibrary: {}
+groupModules:
+- group: Group0
+  modules:
+  - core
+modules:
+- adc
+- dfp
+- i2c1
+- tmr3
+- uart1
+- uart2
+generatedFileHashHistoryMap:
+- file: ..\src\config\default\definitions.h
+  hash: d650f67058f6b4c055f584642cd48c2c7defe08d37d8ddcd194b4da8fd387dbf
+- file: ..\src\config\default\device.h
+  hash: 4d4341a6f9628cea0bf73f980b639f7cb81089e55a60ad7e434be2a71e477442
+- file: ..\src\config\default\exceptions.c
+  hash: df6a7db71f29db985de306abd7b848a24111cef6398ccfb9479449ae4fbc069d
+- file: ..\src\config\default\initialization.c
+  hash: 1cf16b1dffd59d304a3ff239124c16f55843d51d038102c96cf969a2e543d481
+- file: ..\src\config\default\interrupts.c
+  hash: c31945d8cfecef9e4632ef8d9e3003f988e5e0c268b3bb0b7266c364d6748f7a
+- file: ..\src\config\default\interrupts.h
+  hash: 49170d4125c9a4319f63918a104969f76200cb3f1fb41f3c4c03c3b7e6008ff9
+- file: ..\src\config\default\p32MX274F256B.ld
+  hash: dd018a8d9ce3c7d82529d1a414cc85e40a0d85b1798027c12176e889db900944
+- file: ..\src\config\default\peripheral\adc\plib_adc.c
+  hash: da75d03d866c973e5f52fcfa064ba3a7c8d73b92ae1cdc727225c8fb16a04bef
+- file: ..\src\config\default\peripheral\adc\plib_adc.h
+  hash: 6817785a0537cf593c8202688a3b5b2fce77bb277abd3390adeb5ac37eef539e
+- file: ..\src\config\default\peripheral\clk\plib_clk.c
+  hash: 246ceda66f23b6fc5e66477eb99a1367eaa7e0ed381f41f9a576c9897c32dd85
+- file: ..\src\config\default\peripheral\clk\plib_clk.h
+  hash: 35384f2e13e59b7190bf77f6996baf3ea2377ec42df94979a6f793326def5255
+- file: ..\src\config\default\peripheral\evic\plib_evic.c
+  hash: db9ea00b4540740b57d4a8d25b2fb34310969c880e4b503841a6683b67198b40
+- file: ..\src\config\default\peripheral\evic\plib_evic.h
+  hash: 65ddf691b7fbc1fcd57a07a93a4442732effb8c53fc7ceca4464dade923f80f8
+- file: ..\src\config\default\peripheral\gpio\plib_gpio.c
+  hash: b04904ed213c5088d6843483e1ccfa4123f2e5939adae34349c6820f8c1db2ce
+- file: ..\src\config\default\peripheral\gpio\plib_gpio.h
+  hash: bc035621cf81e1dab71c058e8cb5efa823fe2bf48f935858b1f94bdffce6b214
+- file: ..\src\config\default\peripheral\i2c\master\plib_i2c1_master.c
+  hash: 8c4198d0a4cd815ec910b227b1aaf464a742cdc8f0ee911d6de3aa07e5269830
+- file: ..\src\config\default\peripheral\i2c\master\plib_i2c1_master.h
+  hash: 47664df9ffb27e6fc030f11dbb1f86c428bc65302026de6f25264e0227acca6e
+- file: ..\src\config\default\peripheral\i2c\master\plib_i2c_master_common.h
+  hash: 1888013e2cef69a47c7a44bfef9a4de4b9580af719aa9896ac112551a64c9515
+- file: ..\src\config\default\peripheral\i2c\plib_i2c_smbus_common.c
+  hash: 026121a1d5fae1028604b3031f89253ed36f588d037beb3722351261ce514dd2
+- file: ..\src\config\default\peripheral\i2c\plib_i2c_smbus_common.h
+  hash: 585f8d40c9fcaa072abdf3039cbc4b26ee3fbcb902171dd7e79a682e3973f995
+- file: ..\src\config\default\peripheral\tmr\plib_tmr3.c
+  hash: e421f3b1853c67b0d9f33dc573cf27fc1e8b1dd4b0ccc246dbeb4e8e916fc286
+- file: ..\src\config\default\peripheral\tmr\plib_tmr3.h
+  hash: 4507242db0aee1ed83c74dddf264a72e19bf85cf44d8339302e0e8c87030779c
+- file: ..\src\config\default\peripheral\tmr\plib_tmr_common.h
+  hash: fe0f7e886eba99992a90f718b6aa9f2b438b8204094495f72a0d1e83418d3187
+- file: ..\src\config\default\peripheral\uart\plib_uart1.c
+  hash: d43a8620f62e76a21a1f0fc8e3a825667f27f395a190bc9d182c8d3e460187b3
+- file: ..\src\config\default\peripheral\uart\plib_uart1.h
+  hash: a4ef463228a3629b42d450fa86eabc1d32185311664aa955e508d67f51cb5f7b
+- file: ..\src\config\default\peripheral\uart\plib_uart2.c
+  hash: 0a9a169cb570b6752488027bfed4c5e922ff422d6f6f552a3f2a429a4e14c88b
+- file: ..\src\config\default\peripheral\uart\plib_uart2.h
+  hash: 9b27f236bd2443114fab5d6cc79faeb2b138e639eba056389fa6a0a2afe0d6d5
+- file: ..\src\config\default\peripheral\uart\plib_uart_common.h
+  hash: 70213cd740b3ff9a591d93ad6aac9493335851db084dd862275effacdebf710d
+- file: ..\src\config\default\stdio\xc32_monitor.c
+  hash: 858f8710d4287200a5ee7f3b3ad7c24f505aed9c05c16956ab0ff9f7bb162a6a
+- file: ..\src\config\default\toolchain_specifics.h
+  hash: f6f3282ecb4ad8b5ba3487b7d7b8f6cfa3f977240726af07eaab058caf904381
+- file: ..\src\main.c
+  hash: d3c233d419e6304bfacbafc18cc68c0f5c26e365f23b20ea40ccfac458f664c5

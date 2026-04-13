@@ -1,0 +1,177 @@
+configVersion: 1.0.0
+componentName: adc
+coreVersion: 5.8.4
+device: PIC32MX274F256B
+library: []
+dependency:
+- dependencyPackage: class com.microchip.mcc.harmony.HarmonyModule
+  name: adc
+  type: module
+  version: ''
+- dependencyPackage: ''
+  name: csp
+  type: package
+  version: v3.25.0
+customDataClassName: com.microchip.utils_mh3.utils.persistence.CustomModuleData
+data:
+  attachments: {}
+  elementPosition:
+    attributes:
+      id: __ROOTVIEW
+    children:
+    - children:
+      - attributes:
+          id: adc
+          x: '125'
+          y: '108'
+        type: ElementPosition
+      type: ElementPositions
+    type: ComponentGraph
+  symbols:
+    AD1CHS__CH0SA:
+      attributes:
+        id: AD1CHS__CH0SA
+      children:
+      - children:
+        - attributes:
+            value: '6'
+          type: User
+        type: Values
+      type: KeyValueSet
+    AD1CON1__SSRC:
+      attributes:
+        id: AD1CON1__SSRC
+      children:
+      - children:
+        - attributes:
+            value: '2'
+          type: User
+        type: Values
+      type: KeyValueSet
+    AD1CON3__ADCS:
+      attributes:
+        id: AD1CON3__ADCS
+      children:
+      - children:
+        - attributes:
+            value: '6'
+          type: User
+        type: Values
+      type: Integer
+    ADC_AD1CHS:
+      attributes:
+        id: ADC_AD1CHS
+      children:
+      - children:
+        - attributes:
+            id: adc
+            value: '589824'
+          type: Dynamic
+        type: Values
+      type: Hex
+    ADC_AD1CON1:
+      attributes:
+        id: ADC_AD1CON1
+      children:
+      - children:
+        - attributes:
+            id: adc
+            value: '68'
+          type: Dynamic
+        type: Values
+      type: Hex
+    ADC_AD1CON3:
+      attributes:
+        id: ADC_AD1CON3
+      children:
+      - children:
+        - attributes:
+            id: adc
+            value: '7942'
+          type: Dynamic
+        type: Values
+      type: Hex
+    ADC_INTERRUPT:
+      attributes:
+        id: ADC_INTERRUPT
+      children:
+      - children:
+        - attributes:
+            value: 'true'
+          type: User
+        type: Values
+      type: Boolean
+    ADC_TCLK:
+      attributes:
+        id: ADC_TCLK
+      children:
+      - children:
+        - attributes:
+            id: adc
+            value: '388.0'
+          type: Dynamic
+        type: Values
+      type: Float
+    ADC_AD1CON2:
+      attributes:
+        id: ADC_AD1CON2
+      children:
+      - children:
+        - attributes:
+            id: adc
+            value: '0'
+          type: Dynamic
+        type: Values
+      type: Hex
+    ADC_AD1CSSL:
+      attributes:
+        id: ADC_AD1CSSL
+      children:
+      - children:
+        - attributes:
+            id: adc
+            value: '0'
+          type: Dynamic
+        type: Values
+      type: Hex
+    AD1CON2__CSCNA:
+      attributes:
+        id: AD1CON2__CSCNA
+      children:
+      - children:
+        - attributes:
+            value: 'false'
+          type: User
+        type: Values
+      type: Boolean
+    AD1CON2__ALTS:
+      attributes:
+        id: AD1CON2__ALTS
+      children:
+      - children:
+        - attributes:
+            value: '0'
+          type: User
+        type: Values
+      type: KeyValueSet
+    AD1CON1__ASAM:
+      attributes:
+        id: AD1CON1__ASAM
+      children:
+      - children:
+        - attributes:
+            value: 'true'
+          type: User
+        type: Values
+      type: Boolean
+    AD1CON2__BUFM:
+      attributes:
+        id: AD1CON2__BUFM
+      children:
+      - children:
+        - attributes:
+            value: '0'
+          type: User
+        type: Values
+      type: KeyValueSet
+  userData: {}
