@@ -22,8 +22,15 @@ from utils.usb_manager import USBWorker
 from utils.zero_calibration import ZeroCalibration
 from utils.piecewise_linear_calibration import PiecewiseLinearCalibration
 
-#Path to calibration file
-CAL_FILE = os.path.join(os.path.dirname(__file__), "calibration.json")
+#Path to calibration file, resolves to exe directory if frozen, otherwise current file directory
+def get_app_dir():
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    else:
+        return os.path.dirname(os.path.abspath(__file__))
+
+APP_DIR = get_app_dir()
+CAL_FILE = os.path.join(APP_DIR, "calibration.json")
 
 #Main Application Controller
 class LSMDApplication(QObject):
@@ -502,7 +509,7 @@ class LSMDApplication(QObject):
 
     #Load config from json file
     def load_config(self):
-        config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+        config_path = os.path.join(APP_DIR, "config.json")
         try:
             with open(config_path, "r") as f:
                 config = json.load(f)
@@ -514,7 +521,7 @@ class LSMDApplication(QObject):
     
     #Save config to json file
     def save_config(self):
-        config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+        config_path = os.path.join(APP_DIR, "config.json")
         config = {
             "last_ble_address": self.connected_device_address,
             "last_ble_name": self.connected_device_name
