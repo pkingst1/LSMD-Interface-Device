@@ -22,7 +22,7 @@ if %ERRORLEVEL% neq 0 (
 echo [1/3] Installing required Python packages...
 echo.
 
-pip install --upgrade pip
+python -m pip install --upgrade pip
 pip install pyinstaller
 pip install bleak
 pip install PyQt6
@@ -36,7 +36,7 @@ echo [2/3] Building executable...
 echo      This may take 2-5 minutes on first build.
 echo.
 
-pyinstaller LSMD_Interface.spec --noconfirm
+python -m PyInstaller LSMD_Interface.spec --noconfirm
 
 echo.
 
